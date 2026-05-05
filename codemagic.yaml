@@ -24,6 +24,7 @@ workflows:
           -scheme TowRides \
           -configuration Release \
           -sdk iphoneos \
+          -allowProvisioningUpdates \
           -archivePath build/TowRides.xcarchive archive
 
     artifacts:
