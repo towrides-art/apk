@@ -5,11 +5,19 @@ workflows:
     environment:
       xcode: latest
       cocoapods: default
+
     scripts:
-      - name: Install dependencies
+      - name: Clean & Install
         script: |
-          npm install
-          cd ios && pod install
+          rm -rf node_modules
+          rm -rf package-lock.json
+          npm install --legacy-peer-deps
+
+      - name: Install Pods
+        script: |
+          cd ios
+          pod install
+
       - name: Build iOS
         script: |
           xcodebuild -workspace ios/*.xcworkspace \
@@ -17,5 +25,6 @@ workflows:
           -configuration Release \
           -sdk iphoneos \
           -archivePath build/YourAppName.xcarchive archive
+
     artifacts:
       - build/**/*.ipa
