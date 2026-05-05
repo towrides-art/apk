@@ -21,10 +21,10 @@ workflows:
       - name: Build iOS
         script: |
           xcodebuild -workspace ios/*.xcworkspace \
-          -scheme Towrides \
+          -scheme TowRides \
           -configuration Release \
           -sdk iphoneos \
-          -archivePath build/YourAppName.xcarchive archive
+          -archivePath build/TowRides.xcarchive archive
 
     artifacts:
       - build/**/*.ipa
