@@ -5,8 +5,9 @@ workflows:
     max_build_duration: 60
 
     environment:
-      xcode: latest
+      xcode: 16.4
       cocoapods: default
+      node: 20.11.1
 
       ios_signing:
         distribution_type: app_store
@@ -24,7 +25,8 @@ workflows:
       - name: Clean Pods
         script: |
           cd ios
-          pod deintegrate
+          rm -rf Pods Podfile.lock
+          pod repo update
           pod install --repo-update
 
       - name: Set up code signing
