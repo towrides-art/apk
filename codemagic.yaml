@@ -1,31 +1,34 @@
 workflows:
   ios-workflow:
     name: iOS Build
-    max_build_duration: 60
+
     environment:
       xcode: latest
       cocoapods: default
 
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.towrides.app
+
     scripts:
-      - name: Clean & Install
+      - name: Install dependencies
         script: |
-          rm -rf node_modules
-          rm -rf package-lock.json
           npm install --legacy-peer-deps
 
-      - name: Install Pods
+      - name: Install CocoaPods
         script: |
           cd ios
           pod install
 
-      - name: Build iOS
+      - name: Set up code signing
         script: |
-          xcodebuild -workspace ios/*.xcworkspace \
-          -scheme TowRides \
-          -configuration Release \
-          -sdk iphoneos \
-          -allowProvisioningUpdates \
-          -archivePath build/TowRides.xcarchive archive
+          xcode-project use-profiles
+
+      - name: Build IPA
+        script: |
+          xcode-project build-ipa \
+            --workspace "ios/TowRides.xcworkspace" \
+            --scheme "TowRides"
 
     artifacts:
-      - build/**/*.ipa
+      - build/ios/ipa/*.ipa
