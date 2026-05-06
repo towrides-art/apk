@@ -5,7 +5,7 @@ workflows:
     max_build_duration: 60
 
     environment:
-      xcode: 16.4
+      xcode: 16.3
       cocoapods: default
       node: 20.11.1
 
