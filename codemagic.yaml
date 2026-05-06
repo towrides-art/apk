@@ -9,6 +9,9 @@ workflows:
       cocoapods: default
       node: 20.11.1
 
+      vars:
+        RCT_NEW_ARCH_ENABLED: "0"
+
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.towrides.app
