@@ -7,10 +7,11 @@ workflows:
     environment:
       xcode: 16.3
       cocoapods: default
-      node: 20.11.1
+      node: 18.20.4
 
       vars:
         RCT_NEW_ARCH_ENABLED: "0"
+        RCT_FABRIC_ENABLED: "0"
 
       ios_signing:
         distribution_type: app_store
@@ -23,12 +24,19 @@ workflows:
 
       - name: Install dependencies
         script: |
+          rm -rf node_modules
           npm install --legacy-peer-deps
 
       - name: Clean Pods
         script: |
+          rm -rf ~/Library/Developer/Xcode/DerivedData
+          rm -rf ios/build
+          rm -rf ios/Pods
+          rm -rf ios/Podfile.lock
+
           cd ios
-          rm -rf Pods Podfile.lock
+          pod deintegrate
+          pod cache clean --all
           pod repo update
           pod install --repo-update
 
@@ -37,6 +45,9 @@ workflows:
           xcode-project use-profiles
 
       - name: Build IPA
+        env:
+          RCT_NEW_ARCH_ENABLED: 0
+          RCT_FABRIC_ENABLED: 0
         script: |
           xcode-project build-ipa \
             --workspace "ios/TowRides.xcworkspace" \
