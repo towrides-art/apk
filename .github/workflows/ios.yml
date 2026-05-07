@@ -1,0 +1,57 @@
+name: iOS Build
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Xcode 15.2
+      run: |
+        sudo xcode-select -s /Applications/Xcode_15.2.app/Contents/Developer
+        xcodebuild -version
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+    
+    - name: Install dependencies
+      run: |
+        cd userapp
+        npm install --legacy-peer-deps
+    
+    - name: Install CocoaPods
+      run: |
+        cd userapp/ios
+        pod install --repo-update
+    
+    - name: Build iOS
+      run: |
+        cd userapp/ios
+        xcodebuild -workspace TowRides.xcworkspace \
+          -scheme TowRides \
+          -configuration Release \
+          -sdk iphoneos \
+          -archivePath build/TowRides.xcarchive \
+          archive
+    
+    - name: Export IPA
+      run: |
+        cd userapp/ios
+        xcodebuild -exportArchive \
+          -archivePath build/TowRides.xcarchive \
+          -exportPath build/ \
+          -exportOptionsPlist exportOptions.plist
+    
+    - name: Upload IPA
+      uses: actions/upload-artifact@v3
+      with:
+        name: TowRides-iOS
+        path: userapp/ios/build/*.ipa
