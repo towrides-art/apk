@@ -45,10 +45,10 @@ workflows:
           xcode-project use-profiles
 
       - name: Build IPA
-        env:
-          RCT_NEW_ARCH_ENABLED: 0
-          RCT_FABRIC_ENABLED: 0
         script: |
+          export RCT_NEW_ARCH_ENABLED=0
+          export RCT_FABRIC_ENABLED=0
+
           xcode-project build-ipa \
             --workspace "ios/TowRides.xcworkspace" \
             --scheme "TowRides"
