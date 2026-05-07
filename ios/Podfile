@@ -55,6 +55,7 @@ target 'TowRides' do
           config.build_settings['OTHER_CFLAGS'] << '-fno-exceptions'
           config.build_settings['OTHER_CFLAGS'] << '-fno-rtti'
           config.build_settings['CLANG_WARN_OBJC_ROOT_CLASS'] = 'NO'
+          config.build_settings['GCC_WARN_INHIBIT_ALL_WARNINGS'] = 'YES'
         end
       end
     end
