@@ -6,7 +6,7 @@ require Pod::Executable.execute_command('node', ['-p',
     {paths: [process.argv[1]]},
   )', __dir__]).strip
 
-platform :ios, '16.0'
+platform :ios, '15.1'
 
 use_modular_headers!
 
@@ -32,7 +32,6 @@ target 'TowRides' do
     )
 
     installer.pods_project.targets.each do |target|
-
       if target.name.include?('React-Fabric') ||
          target.name.include?('React-graphics') ||
          target.name.include?('React-renderer')
@@ -43,6 +42,8 @@ target 'TowRides' do
         config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '16.0'
         config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'gnu++17'
         config.build_settings['CLANG_CXX_LIBRARY'] = 'libc++'
+        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= ['$(inherited)']
+        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'RCT_NEW_ARCH_ENABLED=0'
       end
     end
   end
