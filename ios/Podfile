@@ -11,7 +11,7 @@ platform :ios, '16.0'
 
 use_modular_headers!
 
-prepare_react_native_project!
+ENV['RCT_FABRIC_ENABLED'] = '0'
 
 linkage = ENV['USE_FRAMEWORKS']
 if linkage != nil
