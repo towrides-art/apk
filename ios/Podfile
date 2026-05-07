@@ -47,6 +47,14 @@ target 'TowRides' do
         config.build_settings['SWIFT_VERSION'] = '5.0'
         config.build_settings['SWIFT_OPTIMIZATION_LEVEL'] = '-Onone'
         config.build_settings['ENABLE_BITCODE'] = 'NO'
+        
+        # Add C++ flags for problematic targets
+        if target.name.include?('react-native-simple-toast') ||
+           target.name.include?('react-native-safe-area-context')
+          config.build_settings['OTHER_CFLAGS'] ||= ['$(inherited)']
+          config.build_settings['OTHER_CFLAGS'] << '-fno-exceptions'
+          config.build_settings['OTHER_CFLAGS'] << '-fno-rtti'
+        end
       end
     end
   end
