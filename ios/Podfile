@@ -27,7 +27,6 @@ target 'TowRides' do
     :hermes_enabled => false,
     :fabric_enabled => false,
     :new_arch_enabled => false,
-    :flipper_configuration => FlipperConfiguration.disabled,
     :app_path => "#{Pod::Config.instance.installation_root}/.."
   )
 
