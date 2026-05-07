@@ -24,17 +24,16 @@ jobs:
     
     - name: Install dependencies
       run: |
-        cd userapp
         npm install --legacy-peer-deps
     
     - name: Install CocoaPods
       run: |
-        cd userapp/ios
+        cd ios
         pod install --repo-update
     
     - name: Build iOS
       run: |
-        cd userapp/ios
+        cd ios
         xcodebuild -workspace TowRides.xcworkspace \
           -scheme TowRides \
           -configuration Release \
@@ -44,7 +43,7 @@ jobs:
     
     - name: Export IPA
       run: |
-        cd userapp/ios
+        cd ios
         xcodebuild -exportArchive \
           -archivePath build/TowRides.xcarchive \
           -exportPath build/ \
@@ -54,4 +53,4 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: TowRides-iOS
-        path: userapp/ios/build/*.ipa
+        path: ios/build/*.ipa
