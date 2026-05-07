@@ -57,12 +57,26 @@ workflows:
           export USE_HERMES=0
 
           cd ios
-          xcodebuild clean
+
+          echo "RCT_NEW_ARCH_ENABLED=0" >> .xcode.env
+          echo "RCT_FABRIC_ENABLED=0" >> .xcode.env
+
+          pod deintegrate
+          rm -rf Pods Podfile.lock build generated
+
+          pod install --repo-update
+
           cd ..
 
-          xcode-project build-ipa \
-            --workspace "ios/TowRides.xcworkspace" \
-            --scheme "TowRides"
+          xcodebuild \
+            -workspace ios/TowRides.xcworkspace \
+            -scheme TowRides \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath ios/build \
+            clean archive \
+            CODE_SIGNING_ALLOWED=NO
 
     artifacts:
-      - build/ios/ipa/*.ipa
+      - ios/build/**/*.xcarchive
+      - /tmp/xcodebuild_logs/*.log
