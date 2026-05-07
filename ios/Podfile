@@ -1,6 +1,5 @@
 ENV['RCT_NEW_ARCH_ENABLED'] = '0'
 
-# Resolve react_native_pods.rb with node to allow for hoisting
 require Pod::Executable.execute_command('node', ['-p',
   'require.resolve(
     "react-native/scripts/react_native_pods.rb",
@@ -13,12 +12,6 @@ use_modular_headers!
 
 prepare_react_native_project!
 
-linkage = ENV['USE_FRAMEWORKS']
-if linkage != nil
-  Pod::UI.puts "Configuring Pod with #{linkage}ally linked Frameworks".green
-  use_frameworks! :linkage => linkage.to_sym
-end
-
 target 'TowRides' do
   config = use_native_modules!
 
@@ -27,6 +20,7 @@ target 'TowRides' do
     :hermes_enabled => false,
     :fabric_enabled => false,
     :new_arch_enabled => false,
+    :production => true,
     :app_path => "#{Pod::Config.instance.installation_root}/.."
   )
 
@@ -38,14 +32,17 @@ target 'TowRides' do
     )
 
     installer.pods_project.targets.each do |target|
+
+      if target.name.include?('React-Fabric') ||
+         target.name.include?('React-graphics') ||
+         target.name.include?('React-renderer')
+        target.remove_from_project
+      end
+
       target.build_configurations.each do |config|
         config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '16.0'
         config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'gnu++17'
         config.build_settings['CLANG_CXX_LIBRARY'] = 'libc++'
-        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= [
-          '$(inherited)',
-          '_LIBCPP_ENABLE_CXX17_REMOVED_UNARY_BINARY_FUNCTION'
-        ]
       end
     end
   end
