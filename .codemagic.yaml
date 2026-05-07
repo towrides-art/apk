@@ -16,6 +16,11 @@ workflows:
           source: true
     
     scripts:
+      - name: Select Xcode 15
+        script: |
+          sudo xcode-select -s /Applications/Xcode-15.0.app/Contents/Developer || sudo xcode-select -s /Applications/Xcode-15.2.app/Contents/Developer || sudo xcode-select -s /Applications/Xcode-15.4.app/Contents/Developer
+          xcodebuild -version
+      
       - name: Install dependencies
         script: |
           npm install --legacy-peer-deps
