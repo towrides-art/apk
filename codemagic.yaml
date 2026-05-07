@@ -30,9 +30,14 @@ workflows:
       - name: Clean Pods
         script: |
           rm -rf ~/Library/Developer/Xcode/DerivedData
+          rm -rf ~/Library/Caches/CocoaPods
           rm -rf ios/build
+          rm -rf ios/build/generated
           rm -rf ios/Pods
           rm -rf ios/Podfile.lock
+          rm -rf node_modules
+
+          npm install --legacy-peer-deps
 
           cd ios
           pod deintegrate
