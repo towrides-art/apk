@@ -7,11 +7,12 @@ workflows:
     environment:
       xcode: 16.0
       cocoapods: default
-      node: 18.20.4
+      node: 18.18.0
 
       vars:
         RCT_NEW_ARCH_ENABLED: "0"
         RCT_FABRIC_ENABLED: "0"
+        USE_HERMES: "0"
 
       ios_signing:
         distribution_type: app_store
@@ -53,6 +54,11 @@ workflows:
         script: |
           export RCT_NEW_ARCH_ENABLED=0
           export RCT_FABRIC_ENABLED=0
+          export USE_HERMES=0
+
+          cd ios
+          xcodebuild clean
+          cd ..
 
           xcode-project build-ipa \
             --workspace "ios/TowRides.xcworkspace" \
