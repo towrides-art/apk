@@ -38,6 +38,11 @@ target 'TowRides' do
         target.remove_from_project
       end
 
+      # Remove react-native-safe-area-context due to Xcode 16 incompatibility
+      if target.name.include?('react-native-safe-area-context')
+        target.remove_from_project
+      end
+
       target.build_configurations.each do |config|
         config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'
         config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'gnu++17'
@@ -49,13 +54,10 @@ target 'TowRides' do
         config.build_settings['ENABLE_BITCODE'] = 'NO'
         
         # Add C++ flags for problematic targets
-        if target.name.include?('react-native-simple-toast') ||
-           target.name.include?('react-native-safe-area-context')
+        if target.name.include?('react-native-simple-toast')
           config.build_settings['OTHER_CFLAGS'] ||= ['$(inherited)']
           config.build_settings['OTHER_CFLAGS'] << '-fno-exceptions'
           config.build_settings['OTHER_CFLAGS'] << '-fno-rtti'
-          config.build_settings['CLANG_WARN_OBJC_ROOT_CLASS'] = 'NO'
-          config.build_settings['GCC_WARN_INHIBIT_ALL_WARNINGS'] = 'YES'
         end
       end
     end
