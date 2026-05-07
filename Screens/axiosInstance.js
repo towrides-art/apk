@@ -3,7 +3,7 @@ import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 // Create Axios instance
 const api = axios.create({
-  baseURL: "http://10.0.2.2:4000/api", // Realtime backend (Android emulator uses 10.0.2.2 for host localhost)
+  baseURL: "https://towrides.in/api", // Production backend URL
   timeout: 10000,
 });
 

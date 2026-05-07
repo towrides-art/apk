@@ -950,7 +950,7 @@ const handleProceedWithBooking = async () => {
         setTimeout(() => {
           navigation.reset({
             index: 0,
-            routes: [{ name: 'OTPScreen' }],
+            routes: [{ name: 'LoginPhone' }],
           });
         }, 1500);
       } else if (err.response?.data?.message) {

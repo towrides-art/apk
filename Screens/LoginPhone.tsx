@@ -6,29 +6,30 @@ import Toast from '../src/utils/toast';
 import { useTheme } from '../src/theme/ThemeProvider';
 import { StyledText, StyledButton, StyledView, Spacer } from '../src/components/styled';
 import { dimensions } from '../src/theme/dimensions';
-import api from './axiosInstance'
+import { sendOTP } from '../src/utils/firebaseAuth';
 export default function LoginPhone({ navigation }: any) {
   const { theme } = useTheme();
   const [countryCode, setCountryCode] = useState('IN' as any);
   const [callingCode, setCallingCode] = useState('91');
   const [phone, setPhone] = useState('');
-  const [name, setName] = useState('');
   const [visible, setVisible] = useState(false);
   
 const nextPress = async () => {
   if (/^\d{10}$/.test(phone)) {  // ensures exactly 10 digits
     try {
-      const res = await api.post("/user/send-otp", { phone: phone });
-      console.log("API Response:", res.data);
-
+      const fullPhone = `+${callingCode || '91'}${phone}`;
+      const otpLink = await sendOTP(fullPhone);
+      
       navigation.navigate("OTPScreen", {
-        name: name || "",
         phone,
-        callingCode: callingCode || "+91", // fallback if needed
+        callingCode: callingCode || "+91",
+        otpLink,
       });
+      Toast.show('OTP link generated. Check console for link.');
+      console.log('OTP Link:', otpLink);
     } catch (err: any) {
-      console.log("API Error:", err.response?.data || err.message);
-      Toast.show("Something went wrong. Please try again."+err);
+      console.log("OTP Error:", err.message);
+      Toast.show("Failed to generate OTP. Please try again.");
     }
   } else {
     Toast.show("Mobile number must be exactly 10 digits");
@@ -78,32 +79,6 @@ const nextPress = async () => {
             We'll text a code to verify your phone
           </StyledText>
 
-          <StyledView style={getInputRowStyle()}>
-            <TouchableOpacity onPress={() => setVisible(true)}>
-              <MaterialIcons 
-                name="person" 
-                size={dimensions.components.icon.large}
-                color={theme.colors.text.secondary}
-              />
-            </TouchableOpacity>
-
-            <TextInput
-              style={[styles.textInput, { 
-                color: theme.colors.text.primary,
-                fontSize: dimensions.typography.fontSize.lg,
-              }]}
-              keyboardType="default"
-              placeholder="Enter Your Name"
-              placeholderTextColor={theme.colors.text.tertiary}
-              onChangeText={(text) => setName(text)}
-              autoFocus={true}
-              value={name}
-              autoCorrect={false}
-              autoComplete="off"
-              spellCheck={false}
-            />
-          </StyledView>
-          
           <StyledView style={getInputRowStyle()}>
             <TouchableOpacity onPress={() => setVisible(true)}>
               <CountryPicker

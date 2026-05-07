@@ -1,18 +1,22 @@
 import React, { useEffect, useRef, useState } from "react";
- import { Alert, KeyboardAvoidingView, Platform, SafeAreaView, StyleSheet, Text,TextInput,TouchableOpacity,View } from "react-native";
+ import { Alert, KeyboardAvoidingView, Modal, Platform, SafeAreaView, StyleSheet, Text,TextInput,TouchableOpacity,View } from "react-native";
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
   import Toast from '../src/utils/toast';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../src/theme/ThemeProvider';
 import api from "./axiosInstance";
+import { sendOTP, confirmOTP, resetConfirmation } from '../src/utils/firebaseAuth';
 
 export default function OTPScreen({navigation,route }:any ){
     const { theme } = useTheme();
-    const {name, phone,callingCode }= route.params;
+    const {name, phone,callingCode, otpLink }= route.params || {};
     const [visible, setVisible] = useState(false);
     const [otp, setOtp] = useState('');
 const inputRef = useRef<TextInput>(null);
     const [seconds, setSeconds] = useState(30);
+    const [showNameModal, setShowNameModal] = useState(false);
+    const [userName, setUserName] = useState('');
+    const [verifiedToken, setVerifiedToken] = useState('');
 const user_details={
   name:name,
   phone:phone,
@@ -27,6 +31,14 @@ const user_details={
 
     return () => clearInterval(interval); // Cleanup on unmount
   }, [seconds]);
+  
+  // Log OTP link for development
+  useEffect(() => {
+    if (otpLink) {
+      console.log('OTP Link:', otpLink);
+      Toast.show('OTP link generated. Check console.');
+    }
+  }, [otpLink]);
     const boxArray = new Array(4).fill(0)
     const handlePress = () => {
     inputRef.current?.focus(); // Safely call focus if ref is set
@@ -35,18 +47,12 @@ const user_details={
       setSeconds(45);
          
   try {
-      const res = await api.post("/send-otp", { mobile: phone });
-      console.log("API Response:", res.data);
-
-      navigation.navigate("OTPScreen", {
-        name: user_details.name || "",
-        phone:user_details.phone,
-        callingCode: callingCode || "+91", // fallback if needed
-      });
-       Toast.show('Verification code sent successfuly');  
+      const fullPhone = `${callingCode || '+91'}${phone}`;
+      await sendOTP(fullPhone);
+      Toast.show('Verification code sent successfully');  
     } catch (err: any) {
-      console.log("API Error:", err.response?.data || err.message);
-      Toast.show("Something went wrong. Please try again."+err);
+      console.log("Firebase Error:", err.message);
+      Toast.show("Failed to send OTP. Please try again.");
     }
     }
  const CheckOTP = async () => {
@@ -56,27 +62,56 @@ const user_details={
   }
 
   try {
-    const res = await api.post("/user/verify-otp", {
-      phone: user_details.phone,
-      name:user_details.name,
-      otp:otp
-    });
-
-    console.log("OTP Verification Response:", res.data);
+    // Verify OTP with backend
+    const fullPhone = `${callingCode || '+91'}${phone}`;
+    const response = await confirmOTP(fullPhone, otp);
+    
+    console.log("OTP Verification Response:", response);
 
     Toast.show("Verification successful!");
 
-    await AsyncStorage.setItem("token", res.data.token);
-    await AsyncStorage.setItem("user_token", res.data.token);
-    await AsyncStorage.setItem("name", res.data.user.name);
+    await AsyncStorage.setItem("token", response.token);
+    await AsyncStorage.setItem("user_token", response.token);
 
+    const returnedName = response.user?.name;
+    if (!returnedName || returnedName === user_details.phone || returnedName === `+91${user_details.phone}`) {
+      // User has no name set, show name input modal
+      setVerifiedToken(response.token);
+      setShowNameModal(true);
+    } else {
+      await AsyncStorage.setItem("name", returnedName);
+      navigation.reset({ 
+        index: 0, 
+        routes: [{ name: "EnableLocationScreen", params: { verified_data: response } }] 
+      });
+    }
+  } catch (err: any) {
+    console.log("ERR VERIFICATION:", err.message);
+    Toast.show(err.message || "OTP verification failed");
+  }
+};
+
+ const saveNameAndProceed = async () => {
+  if (!userName.trim()) {
+    Toast.show("Please enter your name");
+    return;
+  }
+  try {
+    await api.put("/user/profile", { name: userName.trim() });
+    await AsyncStorage.setItem("name", userName.trim());
+    setShowNameModal(false);
     navigation.reset({ 
       index: 0, 
-      routes: [{ name: "EnableLocationScreen", params: { verified_data: res.data } }] 
+      routes: [{ name: "EnableLocationScreen" }] 
     });
   } catch (err: any) {
-    console.log("ERR VERIFICATION:", err.response?.data || err.message);
-    Toast.show(err.response?.data?.message || "OTP verification failed");
+    // Even if profile update fails, proceed with the name
+    await AsyncStorage.setItem("name", userName.trim());
+    setShowNameModal(false);
+    navigation.reset({ 
+      index: 0, 
+      routes: [{ name: "EnableLocationScreen" }] 
+    });
   }
 };
 
@@ -169,6 +204,32 @@ const user_details={
            
  
         </SafeAreaView>
+
+        {/* Name Input Modal */}
+        <Modal visible={showNameModal} animationType="fade" transparent onRequestClose={() => {}}>
+          <View style={{flex:1, backgroundColor:'rgba(0,0,0,0.5)', justifyContent:'center', alignItems:'center'}}>
+            <View style={{backgroundColor: theme.colors.background.primary, borderRadius:20, padding:24, width:'85%', alignItems:'center'}}>
+              <MaterialIcons name="person" size={40} color={theme.colors.interactive.primary} />
+              <Text style={{fontSize:20, fontWeight:'bold', marginTop:12, color: theme.colors.text.primary}}>What's your name?</Text>
+              <Text style={{fontSize:14, marginTop:6, color: theme.colors.text.secondary, textAlign:'center'}}>Please enter your name to continue</Text>
+              <TextInput
+                style={{width:'100%', borderWidth:2, borderColor: theme.colors.border.secondary, borderRadius:12, padding:14, marginTop:20, fontSize:16, color: theme.colors.text.primary}}
+                placeholder="Enter your full name"
+                placeholderTextColor={theme.colors.text.tertiary}
+                value={userName}
+                onChangeText={setUserName}
+                autoFocus
+              />
+              <TouchableOpacity
+                style={{width:'100%', backgroundColor: theme.colors.interactive.primary, borderRadius:12, padding:14, marginTop:16, alignItems:'center'}}
+                onPress={saveNameAndProceed}
+              >
+                <Text style={{fontSize:16, fontWeight:'bold', color: theme.colors.text.inverse}}>Continue</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
         </KeyboardAvoidingView>
     );
 }
