@@ -11,7 +11,7 @@ platform :ios, '16.0'
 
 use_modular_headers!
 
-ENV['RCT_FABRIC_ENABLED'] = '0'
+prepare_react_native_project!
 
 linkage = ENV['USE_FRAMEWORKS']
 if linkage != nil
@@ -27,6 +27,7 @@ target 'TowRides' do
     :hermes_enabled => false,
     :fabric_enabled => false,
     :new_arch_enabled => false,
+    :flipper_configuration => FlipperConfiguration.disabled,
     :app_path => "#{Pod::Config.instance.installation_root}/.."
   )
 
@@ -40,7 +41,7 @@ target 'TowRides' do
     installer.pods_project.targets.each do |target|
       target.build_configurations.each do |config|
         config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '16.0'
-        config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++17'
+        config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'gnu++17'
       end
     end
   end
