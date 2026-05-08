@@ -19,10 +19,16 @@ workflows:
       - name: Install dependencies
         script: |
           npm install --legacy-peer-deps
+
+      - name: Use Xcode 15.4
+        script: |
+          sudo xcode-select --switch /Applications/Xcode-15.4.app
+          xcodebuild -version
       
       - name: Install CocoaPods
         script: |
           cd ios
+          rm -rf Pods Podfile.lock ~/Library/Developer/Xcode/DerivedData
           pod install --repo-update
       
       - name: Build iOS
