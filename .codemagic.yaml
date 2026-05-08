@@ -1,6 +1,6 @@
 workflows:
-  ios-workflow:
-    name: iOS Release Build
+  ios-workflow-v2:
+    name: iOS Release Build (Xcode 15.4)
     max_build_duration: 120
     environment:
       xcode: 15.4
