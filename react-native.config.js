@@ -5,5 +5,10 @@ module.exports = {
         ios: null,
       },
     },
+    'react-native-permissions': {
+      platforms: {
+        ios: null,
+      },
+    },
   },
 };
