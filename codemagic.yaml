@@ -70,13 +70,15 @@ workflows:
           export RCT_NEW_ARCH_ENABLED=0
           export RCT_FABRIC_ENABLED=0
           export USE_HERMES=0
-          export NODE_BINARY="$(which node)"
+          export NODE_BINARY="$(node -p 'process.execPath')"
+          export PATH="$(dirname "$NODE_BINARY"):$PATH"
 
           cd ios
 
           echo "RCT_NEW_ARCH_ENABLED=0" >> .xcode.env
           echo "RCT_FABRIC_ENABLED=0" >> .xcode.env
           echo "NODE_BINARY=$NODE_BINARY" >> .xcode.env
+          echo "PATH=$PATH" >> .xcode.env
 
           pod deintegrate
           rm -rf Pods Podfile.lock build generated
