@@ -5,11 +5,13 @@ workflows:
     max_build_duration: 60
 
     environment:
-      xcode: 16.0
+      xcode: 15.4
       cocoapods: default
-      node: 18.18.0
+      node: 18.20.4
 
       vars:
+        XCODE_PATH: /Applications/Xcode-15.4.app
+        DEVELOPER_DIR: /Applications/Xcode-15.4.app/Contents/Developer
         RCT_NEW_ARCH_ENABLED: "0"
         RCT_FABRIC_ENABLED: "0"
         USE_HERMES: "0"
@@ -28,8 +30,18 @@ workflows:
           rm -rf node_modules
           npm install --legacy-peer-deps
 
+      - name: Use Xcode 15.4
+        script: |
+          if [ ! -d "$XCODE_PATH" ]; then
+            echo "Xcode not found at $XCODE_PATH" && ls /Applications && exit 1
+          fi
+          sudo xcode-select --switch "$XCODE_PATH"
+          export DEVELOPER_DIR="$DEVELOPER_DIR"
+          "$DEVELOPER_DIR/usr/bin/xcodebuild" -version
+
       - name: Clean Pods
         script: |
+          export DEVELOPER_DIR="$DEVELOPER_DIR"
           rm -rf ~/Library/Developer/Xcode/DerivedData
           rm -rf ~/Library/Caches/CocoaPods
           rm -rf ios/build
@@ -52,6 +64,7 @@ workflows:
 
       - name: Build IPA
         script: |
+          export DEVELOPER_DIR="$DEVELOPER_DIR"
           export RCT_NEW_ARCH_ENABLED=0
           export RCT_FABRIC_ENABLED=0
           export USE_HERMES=0
@@ -68,7 +81,7 @@ workflows:
 
           cd ..
 
-          xcodebuild \
+          "$DEVELOPER_DIR/usr/bin/xcodebuild" \
             -workspace ios/TowRides.xcworkspace \
             -scheme TowRides \
             -configuration Release \
