@@ -38,7 +38,8 @@ target 'TowRides' do
          target.name.include?('React-renderer') ||
          target.name.include?('React-ImageManager') ||
          target.name.include?('React-FabricImage') ||
-         target.name.include?('React-RCTFabric')
+         target.name.include?('React-RCTFabric') ||
+         target.name == 'RNSVG'
         target.remove_from_project
       end
 
@@ -62,13 +63,6 @@ target 'TowRides' do
           config.build_settings['OTHER_CFLAGS'] ||= ['$(inherited)']
           config.build_settings['OTHER_CFLAGS'] << '-fno-exceptions'
           config.build_settings['OTHER_CFLAGS'] << '-fno-rtti'
-        end
-
-        # Fix RNSVG compilation with Xcode 16
-        if target.name == 'RNSVG'
-          config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'RCT_ENABLE_NEW_ARCH=0'
-          config.build_settings['OTHER_CFLAGS'] = '$(inherited) -Wno-error=non-virtual-dtor -Wno-error=deprecated'
-          config.build_settings['CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER'] = 'NO'
         end
       end
     end
