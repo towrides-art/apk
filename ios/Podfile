@@ -32,9 +32,13 @@ target 'TowRides' do
     )
 
     installer.pods_project.targets.each do |target|
+      # Remove all Fabric-related targets to avoid hash_compile errors
       if target.name.include?('React-Fabric') ||
          target.name.include?('React-graphics') ||
-         target.name.include?('React-renderer')
+         target.name.include?('React-renderer') ||
+         target.name.include?('React-ImageManager') ||
+         target.name.include?('React-FabricImage') ||
+         target.name.include?('React-RCTFabric')
         target.remove_from_project
       end
 
@@ -52,7 +56,7 @@ target 'TowRides' do
         config.build_settings['SWIFT_VERSION'] = '5.0'
         config.build_settings['SWIFT_OPTIMIZATION_LEVEL'] = '-Onone'
         config.build_settings['ENABLE_BITCODE'] = 'NO'
-        
+
         # Add C++ flags for problematic targets
         if target.name.include?('react-native-simple-toast')
           config.build_settings['OTHER_CFLAGS'] ||= ['$(inherited)']
