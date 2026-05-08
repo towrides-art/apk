@@ -38,8 +38,7 @@ target 'TowRides' do
          target.name.include?('React-renderer') ||
          target.name.include?('React-ImageManager') ||
          target.name.include?('React-FabricImage') ||
-         target.name.include?('React-RCTFabric') ||
-         target.name == 'RNSVG'
+         target.name.include?('React-RCTFabric')
         target.remove_from_project
       end
 
@@ -52,17 +51,21 @@ target 'TowRides' do
         config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'
         config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'gnu++17'
         config.build_settings['CLANG_CXX_LIBRARY'] = 'libc++'
-        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= ['$(inherited)']
-        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'RCT_NEW_ARCH_ENABLED=0'
+        preprocessor_defs = Array(config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'])
+        preprocessor_defs << '$(inherited)' if preprocessor_defs.empty?
+        preprocessor_defs << 'RCT_NEW_ARCH_ENABLED=0' unless preprocessor_defs.include?('RCT_NEW_ARCH_ENABLED=0')
+        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] = preprocessor_defs
         config.build_settings['SWIFT_VERSION'] = '5.0'
         config.build_settings['SWIFT_OPTIMIZATION_LEVEL'] = '-Onone'
         config.build_settings['ENABLE_BITCODE'] = 'NO'
 
         # Add C++ flags for problematic targets
         if target.name.include?('react-native-simple-toast')
-          config.build_settings['OTHER_CFLAGS'] ||= ['$(inherited)']
-          config.build_settings['OTHER_CFLAGS'] << '-fno-exceptions'
-          config.build_settings['OTHER_CFLAGS'] << '-fno-rtti'
+          other_cflags = Array(config.build_settings['OTHER_CFLAGS'])
+          other_cflags << '$(inherited)' if other_cflags.empty?
+          other_cflags << '-fno-exceptions'
+          other_cflags << '-fno-rtti'
+          config.build_settings['OTHER_CFLAGS'] = other_cflags
         end
       end
     end
