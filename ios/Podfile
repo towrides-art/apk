@@ -77,6 +77,16 @@ target 'TowRides' do
           other_cflags << '-fno-rtti'
           config.build_settings['OTHER_CFLAGS'] = other_cflags
         end
+
+        if target.name == 'RNCAsyncStorage'
+          header_search_paths = Array(config.build_settings['HEADER_SEARCH_PATHS'])
+          header_search_paths << '$(inherited)' if header_search_paths.empty?
+          header_search_paths << '"${PODS_ROOT}/Headers/Public/rnasyncstorage"'
+          header_search_paths << '"${PODS_ROOT}/Headers/Public/React-Codegen"'
+          header_search_paths << '"${PODS_ROOT}/Headers/Public/RNCAsyncStorage"'
+          header_search_paths << '"${PODS_ROOT}/Headers/Public/react-native-async-storage"'
+          config.build_settings['HEADER_SEARCH_PATHS'] = header_search_paths
+        end
       end
     end
   end
