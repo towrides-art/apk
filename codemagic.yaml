@@ -5,13 +5,13 @@ workflows:
     max_build_duration: 60
 
     environment:
-      xcode: 15.4
+      xcode: 15.3
       cocoapods: default
       node: 18.20.4
 
       vars:
-        XCODE_PATH: /Applications/Xcode-15.4.app
-        DEVELOPER_DIR: /Applications/Xcode-15.4.app/Contents/Developer
+        XCODE_PATH: /Applications/Xcode-15.3.app
+        DEVELOPER_DIR: /Applications/Xcode-15.3.app/Contents/Developer
         RCT_NEW_ARCH_ENABLED: "0"
         RCT_FABRIC_ENABLED: "0"
         USE_HERMES: "0"
