@@ -38,7 +38,8 @@ target 'TowRides' do
          target.name.include?('React-renderer') ||
          target.name.include?('React-ImageManager') ||
          target.name.include?('React-FabricImage') ||
-         target.name.include?('React-RCTFabric')
+         target.name.include?('React-RCTFabric') ||
+         target.name.include?('RNPermissions')
         target.remove_from_project
       end
 
