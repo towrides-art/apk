@@ -103,6 +103,9 @@ workflows:
 
           cd ..
 
+          mkdir -p /tmp/xcodebuild_logs
+          set -o pipefail
+
           "$DEVELOPER_DIR/usr/bin/xcodebuild" \
             -workspace ios/TowRides.xcworkspace \
             -scheme TowRides \
@@ -110,7 +113,15 @@ workflows:
             -sdk iphoneos \
             -derivedDataPath ios/build \
             clean archive \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=NO \
+            2>&1 | tee /tmp/xcodebuild_logs/xcodebuild.log
+
+          status=$?
+          if [ $status -ne 0 ]; then
+            echo "--- xcodebuild last 200 lines ---"
+            tail -n 200 /tmp/xcodebuild_logs/xcodebuild.log
+            exit $status
+          fi
 
     artifacts:
       - ios/build/**/*.xcarchive
