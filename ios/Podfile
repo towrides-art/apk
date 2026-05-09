@@ -74,7 +74,7 @@ target 'TowRides' do
         config.build_settings['CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER'] = 'NO'
         preprocessor_defs = Array(config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'])
         preprocessor_defs << '$(inherited)' if preprocessor_defs.empty?
-        preprocessor_defs << 'RCT_NEW_ARCH_ENABLED=0' unless preprocessor_defs.include?('RCT_NEW_ARCH_ENABLED=0')
+        preprocessor_defs.reject! { |definition| definition.to_s.start_with?('RCT_NEW_ARCH_ENABLED') }
         config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] = preprocessor_defs
         config.build_settings['SWIFT_VERSION'] = '5.0'
         config.build_settings['SWIFT_OPTIMIZATION_LEVEL'] = '-Onone'
