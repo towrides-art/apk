@@ -17,7 +17,15 @@ import api from './axiosInstance';
 import axios from 'axios';
 import MapView, { Marker } from 'react-native-maps';
 import MapViewDirections from 'react-native-maps-directions';
-import { connectUserSocket, onRideAccepted, onRideCancelled, onDriverArrived, disconnectSocket } from '../src/services/socketService';
+import {
+  connectUserSocket,
+  onRideAccepted,
+  onRideCancelled,
+  onDriverArrived,
+  onRideStarted,
+  onRideCompleted,
+  disconnectSocket,
+} from '../src/services/socketService';
 
 const POLL_INTERVAL = 10000;
 const GOOGLE_MAPS_API_KEY = 'AIzaSyCr6FbhZa_qV3jn7bz6lr7OZYfTz5Xrpzo';
@@ -32,6 +40,17 @@ interface RouteParams {
   selectedVehicle?: string;
   selected_tow_type?: string;
 }
+
+const normalizeRideStatus = (raw?: string) => {
+  if (!raw) return 'searching';
+  const status = raw.toLowerCase();
+  if (['requested', 'pending'].includes(status)) return 'searching';
+  if (['ride_started', 'ride-started', 'started', 'in_progress', 'on_trip'].includes(status)) return 'in_progress';
+  return status;
+};
+
+const shouldNavigateToTracking = (status: string) =>
+  ['accepted', 'arrived', 'in_progress', 'completed'].includes(status);
 
 const SearchingProvider: React.FC = () => {
   const { theme, isDark } = useTheme();
@@ -48,6 +67,33 @@ const SearchingProvider: React.FC = () => {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const isMountedRef = useRef(true);
   const cancelTokenSourceRef = useRef(axios.CancelToken.source());
+
+  const navigateToTracking = (payload: any, statusOverride?: string) => {
+    const bookingDetails = payload?.details || payload?.booking || payload;
+    const normalizedStatus = normalizeRideStatus(statusOverride || bookingDetails?.status || payload?.status);
+    const driverData =
+      payload?.driver ||
+      bookingDetails?.driver ||
+      (bookingDetails?.driver_name ? { name: bookingDetails.driver_name, phone: bookingDetails.driver_phone } : null);
+
+    navigation.reset({
+      index: 0,
+      routes: [
+        {
+          name: 'TrackingScreen',
+          params: {
+            bookingId: bookingDetails?.id || bookingId,
+            booking: { ...bookingDetails, status: normalizedStatus },
+            driver: driverData,
+            selectedLocation,
+            selected_drop_points,
+            totalPrice,
+            bookingPin: bookingDetails?.pin || payload?.pin || bookingPin,
+          },
+        },
+      ],
+    });
+  };
 
   // Animations
   const pulseAnim = useRef(new Animated.Value(0)).current;
@@ -122,28 +168,25 @@ const SearchingProvider: React.FC = () => {
       if (!isMountedRef.current) return;
 
       if (response.data) {
-        const rideData = response.data.data || response.data;
-        const status = rideData.status?.toLowerCase();
+        const responseData = response.data;
+        const rideData = responseData.data || responseData.details || responseData.booking || responseData;
+        const status = normalizeRideStatus(responseData.status || rideData?.status);
         setCurrentStatus(status);
         setPollCount(prev => prev + 1);
 
-        if (status === 'accepted') {
-          setIsPolling(false);
-          clearInterval(intervalRef.current!);
-          navigation.reset({
-            index: 0,
-            routes: [{ name: 'TrackingScreen', params: {
-            bookingId, booking: rideData, driver: { name: rideData.driver_name, phone: rideData.driver_phone }, selectedLocation, selected_drop_points, totalPrice, bookingPin: rideData.pin || bookingPin
-          } }]
-          });
-        }
-
         if (status === 'cancelled') {
           setIsPolling(false);
-          clearInterval(intervalRef.current!);
+          if (intervalRef.current) clearInterval(intervalRef.current);
           Alert.alert('Booking Cancelled', 'Your booking has been cancelled.', [
             { text: 'OK', onPress: () => navigation.navigate('DashboardScreen') }
           ]);
+          return;
+        }
+
+        if (shouldNavigateToTracking(status)) {
+          setIsPolling(false);
+          if (intervalRef.current) clearInterval(intervalRef.current);
+          navigateToTracking(responseData, status);
         }
       }
     } catch (error: any) {
@@ -170,6 +213,9 @@ const SearchingProvider: React.FC = () => {
     // Connect socket for real-time updates
     let unsub1: (() => void) | undefined;
     let unsub2: (() => void) | undefined;
+    let unsub3: (() => void) | undefined;
+    let unsub4: (() => void) | undefined;
+    let unsub5: (() => void) | undefined;
     (async () => {
       try {
         await connectUserSocket();
@@ -177,19 +223,33 @@ const SearchingProvider: React.FC = () => {
           if (!isMountedRef.current) return;
           setIsPolling(false);
           if (intervalRef.current) clearInterval(intervalRef.current);
-          setCurrentStatus('accepted');
-          navigation.reset({
-            index: 0,
-            routes: [{ name: 'TrackingScreen', params: {
-            bookingId: data.id || bookingId,
-            booking: data,
-            driver: { name: data.driver_name, phone: data.driver_phone },
-            selectedLocation,
-            selected_drop_points,
-            totalPrice,
-            bookingPin: data.pin || bookingPin
-          } }]
-          });
+          const normalized = normalizeRideStatus(data?.status || 'accepted');
+          setCurrentStatus(normalized);
+          navigateToTracking(data, normalized);
+        });
+        unsub3 = onDriverArrived((data: any) => {
+          if (!isMountedRef.current) return;
+          setIsPolling(false);
+          if (intervalRef.current) clearInterval(intervalRef.current);
+          const normalized = normalizeRideStatus(data?.status || 'arrived');
+          setCurrentStatus(normalized);
+          navigateToTracking(data, normalized);
+        });
+        unsub4 = onRideStarted((data: any) => {
+          if (!isMountedRef.current) return;
+          setIsPolling(false);
+          if (intervalRef.current) clearInterval(intervalRef.current);
+          const normalized = normalizeRideStatus(data?.status || 'in_progress');
+          setCurrentStatus(normalized);
+          navigateToTracking(data, normalized);
+        });
+        unsub5 = onRideCompleted((data: any) => {
+          if (!isMountedRef.current) return;
+          setIsPolling(false);
+          if (intervalRef.current) clearInterval(intervalRef.current);
+          const normalized = normalizeRideStatus(data?.status || 'completed');
+          setCurrentStatus(normalized);
+          navigateToTracking(data, normalized);
         });
         unsub2 = onRideCancelled((data: any) => {
           if (!isMountedRef.current) return;
@@ -212,6 +272,9 @@ const SearchingProvider: React.FC = () => {
       if (cancelTokenSourceRef.current) cancelTokenSourceRef.current.cancel('Component unmounted');
       if (unsub1) unsub1();
       if (unsub2) unsub2();
+      if (unsub3) unsub3();
+      if (unsub4) unsub4();
+      if (unsub5) unsub5();
       disconnectSocket();
     };
   }, [bookingId]);

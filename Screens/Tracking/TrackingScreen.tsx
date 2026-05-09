@@ -28,7 +28,15 @@ const database = getDatabase(app);
 
 const { width, height } = Dimensions.get('window');
 
-const PROGRESS_STEPS = ['Searching', 'Assigned', 'On the Way', 'Arrived'];
+const PROGRESS_STEPS = ['Searching', 'Assigned', 'Arrived', 'On Trip', 'Completed'];
+
+const normalizeRideStatus = (raw?: string) => {
+  if (!raw) return 'searching';
+  const status = raw.toLowerCase();
+  if (['requested', 'pending'].includes(status)) return 'searching';
+  if (['ride_started', 'ride-started', 'started', 'in_progress', 'on_trip'].includes(status)) return 'in_progress';
+  return status;
+};
 
 export default function TrackingScreen({ navigation, route }: any) {
   const { theme } = useTheme();
@@ -36,7 +44,7 @@ export default function TrackingScreen({ navigation, route }: any) {
   const initialBooking = route?.params?.booking;
 
   // Ride status states
-  const [rideStatus, setRideStatus] = useState('pending');
+  const [rideStatus, setRideStatus] = useState('searching');
   const [driver, setDriver] = useState<any>(null);
   const [bookingDetails, setBookingDetails] = useState<any>(initialBooking || null);
   const [driverLocation, setDriverLocation] = useState<any>(null);
@@ -110,6 +118,9 @@ export default function TrackingScreen({ navigation, route }: any) {
     
     // Parse initial booking data if available
     if (initialBooking) {
+      const normalized = normalizeRideStatus(initialBooking.status);
+      setRideStatus(normalized);
+      setBookingDetails({ ...initialBooking, status: normalized });
       parseBookingData(initialBooking);
     }
 
@@ -160,35 +171,39 @@ export default function TrackingScreen({ navigation, route }: any) {
         });
 
         if (response.data) {
-          const rideData = response.data.data || response.data;
-          const status = rideData.status?.toLowerCase();
-          const driverData = rideData.driver_name ? { name: rideData.driver_name, phone: rideData.driver_phone } : null;
-          
-          console.log('Current ride status:', status);
-          setRideStatus(status);
+          const responseData = response.data;
+          const rideData = responseData.data || responseData.details || responseData.booking || responseData;
+          const normalizedStatus = normalizeRideStatus(responseData.status || rideData?.status);
+          const driverData =
+            responseData.driver ||
+            rideData?.driver ||
+            (rideData?.driver_name ? { name: rideData.driver_name, phone: rideData.driver_phone } : null);
+
+          console.log('Current ride status:', normalizedStatus);
+          setRideStatus(normalizedStatus);
           if (driverData) setDriver(driverData);
-          setBookingDetails(rideData);
-          
+          setBookingDetails({ ...rideData, status: normalizedStatus });
+
           // Parse locations if not already set
           if (rideData && !pickupLocation) {
             parseBookingData(rideData);
           }
-          
+
           // Check if already rated
           if (rideData?.user_rating) {
             setHasRated(true);
             setRating(rideData.user_rating);
             setReview(rideData.user_review || '');
           }
-          
+
           // Show rating modal when ride is completed and not rated
-          if (status === 'completed' && !rideData?.user_rating && !showRatingModal) {
+          if (normalizedStatus === 'completed' && !rideData?.user_rating && !showRatingModal) {
             setTimeout(() => {
               setShowRatingModal(true);
               stopStatusPolling(); // Stop polling once completed
             }, 2000);
           }
-          
+
           setPollCount(prev => prev + 1);
         }
         
@@ -412,31 +427,55 @@ export default function TrackingScreen({ navigation, route }: any) {
   // Progress step index
   const getStepIndex = () => {
     switch (rideStatus) {
-      case 'pending': case 'searching': return 0;
-      case 'accepted': return 1;
-      case 'in_progress': return 2;
-      case 'completed': return 3;
+      case 'pending':
+      case 'searching':
+        return 0;
+      case 'accepted':
+        return 1;
+      case 'arrived':
+        return 2;
+      case 'in_progress':
+        return 3;
+      case 'completed':
+        return 4;
       default: return 0;
     }
   };
 
   const getStatusLabel = () => {
     switch (rideStatus) {
-      case 'pending': case 'searching': return 'Finding driver';
-      case 'accepted': return 'Driver on the way';
-      case 'in_progress': return 'Trip in progress';
-      case 'completed': return 'Trip completed';
-      case 'cancelled': return 'Ride cancelled';
+      case 'pending':
+      case 'searching':
+        return 'Finding driver';
+      case 'accepted':
+        return 'Driver on the way';
+      case 'arrived':
+        return 'Driver arrived';
+      case 'in_progress':
+        return 'Trip in progress';
+      case 'completed':
+        return 'Trip completed';
+      case 'cancelled':
+        return 'Ride cancelled';
       default: return 'Tracking';
     }
   };
 
   const getStatusEmoji = () => {
     switch (rideStatus) {
-      case 'pending': case 'searching': return '🔍';
-      case 'accepted': return '🚗';
-      case 'in_progress': return '🚛';
-      case 'completed': return '✅';
+      case 'pending':
+      case 'searching':
+        return '🔍';
+      case 'accepted':
+        return '🚗';
+      case 'arrived':
+        return '📍';
+      case 'in_progress':
+        return '🚛';
+      case 'completed':
+        return '✅';
+      case 'cancelled':
+        return '❌';
       default: return '📍';
     }
   };
@@ -491,7 +530,7 @@ export default function TrackingScreen({ navigation, route }: any) {
         {dropLocation && (
           <Marker coordinate={dropLocation} title="Drop" pinColor="#F44336" />
         )}
-        {driverLocation && bookingDetails?.status === 'accepted' && (
+        {driverLocation && pickupLocation && (rideStatus === 'accepted' || rideStatus === 'arrived') && (
           <>
             <Marker coordinate={driverLocation} title="Driver" anchor={{ x: 0.5, y: 0.5 }}>
               <View style={s.driverMarker}>
@@ -509,7 +548,7 @@ export default function TrackingScreen({ navigation, route }: any) {
             />
           </>
         )}
-        {bookingDetails?.status === 'in_progress' && pickupLocation && dropLocation && (
+        {rideStatus === 'in_progress' && pickupLocation && dropLocation && (
           <MapViewDirections
             origin={pickupLocation}
             destination={dropLocation}
