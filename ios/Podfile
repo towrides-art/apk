@@ -1,4 +1,10 @@
 ENV['RCT_NEW_ARCH_ENABLED'] = '0'
+ENV['RCT_SKIP_CODEGEN'] = '1'
+node_binary = ENV['NODE_BINARY']
+if node_binary.nil? || node_binary.empty?
+  node_binary = Pod::Executable.execute_command('which', ['node']).strip
+end
+ENV['NODE_BINARY'] = node_binary
 
 require Pod::Executable.execute_command('node', ['-p',
   'require.resolve(
@@ -46,6 +52,12 @@ target 'TowRides' do
       # Remove react-native-safe-area-context due to Xcode 16 incompatibility
       if target.name.include?('react-native-safe-area-context')
         target.remove_from_project
+      end
+
+      if target.name == 'React-Codegen'
+        target.build_configurations.each do |config|
+          config.build_settings['NODE_BINARY'] = node_binary
+        end
       end
 
       target.build_configurations.each do |config|

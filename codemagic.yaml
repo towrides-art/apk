@@ -70,15 +70,31 @@ workflows:
           export RCT_NEW_ARCH_ENABLED=0
           export RCT_FABRIC_ENABLED=0
           export USE_HERMES=0
-          export NODE_BINARY="$(node -p 'process.execPath')"
+          export RCT_SKIP_CODEGEN=1
+          NODE_BINARY="$(command -v node)"
+          if [ -z "$NODE_BINARY" ]; then
+            echo "Node not found in PATH" && exit 1
+          fi
+          export NODE_BINARY
           export PATH="$(dirname "$NODE_BINARY"):$PATH"
 
           cd ios
 
-          echo "RCT_NEW_ARCH_ENABLED=0" >> .xcode.env
-          echo "RCT_FABRIC_ENABLED=0" >> .xcode.env
-          echo "NODE_BINARY=$NODE_BINARY" >> .xcode.env
-          echo "PATH=$PATH" >> .xcode.env
+          cat <<EOF > .xcode.env
+          RCT_NEW_ARCH_ENABLED=0
+          RCT_FABRIC_ENABLED=0
+          RCT_SKIP_CODEGEN=1
+          NODE_BINARY=$NODE_BINARY
+          PATH=$PATH
+          EOF
+
+          cat <<EOF > .xcode.env.local
+          RCT_NEW_ARCH_ENABLED=0
+          RCT_FABRIC_ENABLED=0
+          RCT_SKIP_CODEGEN=1
+          NODE_BINARY=$NODE_BINARY
+          PATH=$PATH
+          EOF
 
           pod deintegrate
           rm -rf Pods Podfile.lock build generated
