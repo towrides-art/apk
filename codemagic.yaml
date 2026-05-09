@@ -118,6 +118,10 @@ workflows:
 
           status=$?
           if [ $status -ne 0 ]; then
+            echo "--- xcodebuild error lines ---"
+            grep -n "error:" /tmp/xcodebuild_logs/xcodebuild.log | tail -n 200 || true
+            echo "--- xcodebuild RNCWebViewModule.mm lines ---"
+            grep -n "RNCWebViewModule.mm" /tmp/xcodebuild_logs/xcodebuild.log | tail -n 200 || true
             echo "--- xcodebuild last 200 lines ---"
             tail -n 200 /tmp/xcodebuild_logs/xcodebuild.log
             exit $status
