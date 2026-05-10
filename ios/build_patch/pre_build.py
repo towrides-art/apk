@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 """
-Pre-build setup script - Python version for reliable file patching
+Pre-build setup script - ULTRA AGGRESSIVE version
 This runs before xcodebuild to patch source files
 """
 
 import os
 import sys
 import shutil
+import re
 
-print("=== PRE-BUILD SETUP (Python) ===")
+print("=== PRE-BUILD SETUP (ULTRA) ===")
+print(f"Python version: {sys.version}")
+print(f"Current directory: {os.getcwd()}")
 
 # 1. Create dummy FirebaseAuth-Swift.h headers everywhere
 print("Creating dummy Swift headers...")
@@ -142,9 +145,25 @@ ultra_pragma = '''#pragma clang diagnostic push
 
 def force_patch_file(filepath, is_auth=False):
     """Force patch a file by prepending pragmas"""
+    print(f"  Attempting to patch: {filepath}")
+    print(f"  Current working dir: {os.getcwd()}")
+    
+    # Check both absolute and relative paths
+    abs_path = os.path.abspath(filepath)
+    print(f"  Absolute path: {abs_path}")
+    print(f"  File exists (relative): {os.path.exists(filepath)}")
+    print(f"  File exists (absolute): {os.path.exists(abs_path)}")
+    
+    # Use absolute path if relative doesn't work
+    if not os.path.exists(filepath) and os.path.exists(abs_path):
+        filepath = abs_path
+        print(f"  Using absolute path instead")
+    
     if not os.path.exists(filepath):
-        print(f"  File not found: {filepath}")
+        print(f"  ✗✗✗ File NOT FOUND: {filepath}")
         return False
+    
+    print(f"  File found, proceeding to patch...")
     
     try:
         # Read original
@@ -216,18 +235,46 @@ def force_patch_file(filepath, is_auth=False):
 
 # FORCE patch the critical files
 print("\n=== FORCE PATCHING CRITICAL FILES ===")
-force_patch_file(messaging_app_delegate)
-force_patch_file(messaging_un_center)
-force_patch_file(auth_module, is_auth=True)
+success_count = 0
+fail_count = 0
+
+result = force_patch_file(messaging_app_delegate)
+if result:
+    success_count += 1
+else:
+    fail_count += 1
+    
+result = force_patch_file(messaging_un_center)
+if result:
+    success_count += 1
+else:
+    fail_count += 1
+    
+result = force_patch_file(auth_module, is_auth=True)
+if result:
+    success_count += 1
+else:
+    fail_count += 1
+
+print(f"\n=== CRITICAL FILES RESULT: {success_count} success, {fail_count} failed ===")
 
 # Also patch ALL files in messaging directory
 print("\n=== PATCHING ALL MESSAGING FILES ===")
 messaging_dir = "node_modules/@react-native-firebase/messaging/ios/RNFBMessaging"
 if os.path.exists(messaging_dir):
+    print(f"  Found messaging directory: {messaging_dir}")
     for filename in os.listdir(messaging_dir):
         if filename.endswith('.m'):
             filepath = os.path.join(messaging_dir, filename)
-            force_patch_file(filepath)
+            print(f"  Found .m file: {filename}")
+            result = force_patch_file(filepath)
+            if result:
+                success_count += 1
+            else:
+                fail_count += 1
+    print(f"\n=== ALL FILES RESULT: {success_count} success, {fail_count} failed ===")
+else:
+    print(f"  ✗✗✗ Messaging directory NOT FOUND: {messaging_dir}")
 
 # 4. Patch ALL other Firebase modules for safety
 print("\nPatching all other Firebase modules...")
