@@ -228,7 +228,9 @@ target 'TowRides' do
             '"${PODS_CONFIGURATION_BUILD_DIR}/RNFBMessaging/RNFBMessaging.framework/Headers"',
             '"${PODS_CONFIGURATION_BUILD_DIR}/FirebaseCore/FirebaseCore.framework/Headers"',
             '"${PODS_CONFIGURATION_BUILD_DIR}/FirebaseMessaging/FirebaseMessaging.framework/Headers"',
-            '"${PODS_CONFIGURATION_BUILD_DIR}/FirebaseAuth/FirebaseAuth.framework/Headers"'
+            '"${PODS_CONFIGURATION_BUILD_DIR}/FirebaseAuth/FirebaseAuth.framework/Headers"',
+            '"${PODS_ROOT}/FirebaseAuth/FirebaseAuth/Sources"',
+            '"${PODS_ROOT}/Headers/Public/FirebaseAuth"'
           ]
           
           current_headers = Array(config.build_settings['HEADER_SEARCH_PATHS'])
@@ -236,6 +238,15 @@ target 'TowRides' do
             current_headers << path unless current_headers.include?(path)
           end
           config.build_settings['HEADER_SEARCH_PATHS'] = current_headers
+          
+          # EXTRA: RNFBAuth specific Swift header paths
+          if target.name == 'RNFBAuth'
+            config.build_settings['LIBRARY_SEARCH_PATHS'] = [
+              '$(inherited)',
+              '"${PODS_CONFIGURATION_BUILD_DIR}/FirebaseAuth"',
+              '"${PODS_CONFIGURATION_BUILD_DIR}/FirebaseCore"'
+            ]
+          end
           
           # Framework search paths for RNFB pods
           config.build_settings['FRAMEWORK_SEARCH_PATHS'] = [

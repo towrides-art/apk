@@ -400,9 +400,11 @@ workflows:
           DEFINES_MODULE = YES
           CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES = YES
           // Header search paths for Swift generated headers
-          HEADER_SEARCH_PATHS = $(inherited) "${PODS_CONFIGURATION_BUILD_DIR}/FirebaseAuth/FirebaseAuth.framework/Headers" "${PODS_CONFIGURATION_BUILD_DIR}/FirebaseCore/FirebaseCore.framework/Headers" "${PODS_CONFIGURATION_BUILD_DIR}/FirebaseMessaging/FirebaseMessaging.framework/Headers" "${PODS_CONFIGURATION_BUILD_DIR}/FirebaseInstallations/FirebaseInstallations.framework/Headers"
+          HEADER_SEARCH_PATHS = $(inherited) "${PODS_CONFIGURATION_BUILD_DIR}/FirebaseAuth/FirebaseAuth.framework/Headers" "${PODS_CONFIGURATION_BUILD_DIR}/FirebaseCore/FirebaseCore.framework/Headers" "${PODS_CONFIGURATION_BUILD_DIR}/FirebaseMessaging/FirebaseMessaging.framework/Headers" "${PODS_CONFIGURATION_BUILD_DIR}/FirebaseInstallations/FirebaseInstallations.framework/Headers" "${PODS_ROOT}/FirebaseAuth/FirebaseAuth/Sources" "${PODS_ROOT}/Headers/Public/FirebaseAuth"
           // Framework search paths
           FRAMEWORK_SEARCH_PATHS = $(inherited) "${PODS_CONFIGURATION_BUILD_DIR}/FirebaseAuth" "${PODS_CONFIGURATION_BUILD_DIR}/FirebaseCore" "${PODS_CONFIGURATION_BUILD_DIR}/FirebaseMessaging" "${PODS_CONFIGURATION_BUILD_DIR}/FirebaseInstallations" "${PODS_CONFIGURATION_BUILD_DIR}/GoogleUtilities" "${PODS_CONFIGURATION_BUILD_DIR}/GTMSessionFetcher"
+          // System framework search paths
+          LIBRARY_SEARCH_PATHS = $(inherited) "${PODS_CONFIGURATION_BUILD_DIR}/FirebaseAuth" "${PODS_CONFIGURATION_BUILD_DIR}/FirebaseCore"
           PODCONFIG
                 # Append the original inherits but cleaned
                 echo "POD_CONFIGURATION_RELEASE = 1" >> "$config_file"
@@ -411,6 +413,14 @@ workflows:
               fi
             done
           done
+          
+          # MEGA FIX: RNFBAuth specific - add direct Swift header import workaround
+          echo "=== MEGA: Patching RNFBAuth source for Swift header ==="
+          if [ -f "node_modules/@react-native-firebase/auth/ios/RNFBAuth/RNFBAuthModule.m" ]; then
+            echo "Patching RNFBAuthModule.m for Swift header..."
+            # Add a preprocessor workaround at the top of the file
+            sed -i '' '1s/^/#ifndef FIREBASE_AUTH_SWIFT_HEADER\\n#define FIREBASE_AUTH_SWIFT_HEADER <FirebaseAuth\/FirebaseAuth-Swift.h>\\n#endif\\n/' node_modules/@react-native-firebase/auth/ios/RNFBAuth/RNFBAuthModule.m 2>/dev/null || true
+          fi
           
           # Verify RNFBMessaging config
           echo "=== Verifying RNFBMessaging xcconfig ==="
