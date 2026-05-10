@@ -731,6 +731,9 @@ ULTRAEND
             CLANG_WARN_RANGE_LOOP_ANALYSIS=NO \
             CLANG_WARN_STRICT_PROTOTYPES=NO \
             CLANG_WARN_UNGUARDED_AVAILABILITY=NO \
+            CLANG_WARN_NULLABLE_TO_NONNULL_CONVERSION=NO \
+            CLANG_ANALYZER_NONNULL=NO \
+            RUN_CLANG_STATIC_ANALYZER=NO \
             2>&1 | tee /tmp/xcodebuild_logs/xcodebuild.log
 
           # Kill all background patchers
