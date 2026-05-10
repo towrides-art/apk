@@ -271,6 +271,13 @@ target 'TowRides' do
           config.build_settings['OTHER_CFLAGS'] = ['-w', '-Wno-error', '-Wno-everything']
           config.build_settings['GCC_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
         end
+        
+        # Fix for PromisesObjC (FBLPromises - has -Werror issues)
+        if target.name.include?('PromisesObjC')
+          config.build_settings['OTHER_CFLAGS'] = ['-w', '-Wno-error', '-Wno-everything']
+          config.build_settings['GCC_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
+          config.build_settings['WARNING_CFLAGS'] = '-w'
+        end
       end
     end
   end
