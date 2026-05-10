@@ -235,8 +235,27 @@ PRAGMAEOF
           pod install --repo-update
           
           # Patch generated xcconfig files to remove ALL -Werror flags
-          echo "=== Patching xcconfig files to remove -Werror flags ==="
-          find Pods/Target\ Support\ Files -name "*.xcconfig" -type f -exec sed -i '' 's/-Werror[^[:space:]]*//g' {} \; 2>/dev/null || true
+          echo "=== AGGRESSIVELY Patching xcconfig files ==="
+          
+          # Find and patch ALL xcconfig files
+          find Pods/Target\ Support\ Files -name "*.xcconfig" -type f | while read file; do
+            echo "Patching: $file"
+            # Remove all -Werror variants
+            sed -i.bak 's/-Werror[^[:space:]]*/ /g' "$file"
+            sed -i.bak 's/-Werror=[^[:space:]]*/ /g' "$file"
+            sed -i.bak 's/GCC_TREAT_WARNINGS_AS_ERRORS = YES/GCC_TREAT_WARNINGS_AS_ERRORS = NO/g' "$file"
+            # Add -w to suppress all warnings
+            if ! grep -q "OTHER_CFLAGS.*-w" "$file"; then
+              echo "OTHER_CFLAGS = -w" >> "$file"
+            fi
+          done
+          
+          # Verify patching
+          echo "=== Verifying RNFBAuth.xcconfig ==="
+          cat Pods/Target\ Support\ Files/RNFBAuth/RNFBAuth.release.xcconfig | grep -E "(WERROR|WARNING|OTHER_CFLAGS)" || echo "No warning flags found (GOOD)"
+          
+          echo "=== Verifying RNFBMessaging.xcconfig ==="
+          cat Pods/Target\ Support\ Files/RNFBMessaging/RNFBMessaging.release.xcconfig | grep -E "(WERROR|WARNING|OTHER_CFLAGS)" || echo "No warning flags found (GOOD)"
           find Pods/Target\ Support\ Files -name "*.xcconfig" -type f -exec sed -i '' 's/WARNING_CFLAGS = /WARNING_CFLAGS = -w /g' {} \; 2>/dev/null || true
           find Pods/Target\ Support\ Files -name "*.xcconfig" -type f -exec sed -i '' 's/GCC_TREAT_WARNINGS_AS_ERRORS = YES/GCC_TREAT_WARNINGS_AS_ERRORS = NO/g' {} \; 2>/dev/null || true
           
