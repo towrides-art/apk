@@ -1,0 +1,158 @@
+import * as React from 'react';
+import { View, Text, Button, StyleSheet, Platform } from 'react-native';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { check, PERMISSIONS, RESULTS } from 'react-native-permissions';
+import { ThemeProvider, useTheme } from './src/theme/ThemeProvider';
+import { StyledView, StyledText, StyledButton } from './src/components/styled';
+import AnimatedSplashScreen from './Screens/AnimatedSplashScreen';
+
+import PreLoginScreen from './Screens/PreLoginScreen';
+import LoginPhone from './Screens/LoginPhone';
+import OTPScreen from './Screens/OTPScreen';
+import Toast from './src/utils/toast';
+import EnableLocationScreen from './Screens/EnableLocationScreen';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import DashboardScreen from './Screens/DashboardScreen';
+import CustomSidebarScreen from './Screens/Components/Sidebar';
+import LocationErrorPage from './Screens/LocationErrorPage';
+import SearchingProvider from './Screens/SearchingProvider';
+import NewDashboard from './Screens/NewDashboard';
+import RideHistoryScreen from './Screens/RideHistoryScreen';
+import InvoiceScreen from './Screens/InvoiceScreen';
+import FeedbackScreen from './Screens/FeedbackScreen';
+import WalletScreen from './Screens/WalletScreen';
+import ProfileScreen from './Screens/ProfileScreen';
+import HelpScreen from './Screens/HelpScreen';
+import TrackingScreen from './Screens/Tracking/TrackingScreen';
+import PaymentScreen from './Screens/PaymentPage'
+import SplashVideo from './Screens/VideoSplash';
+import DriverSupport from './Screens/Support';
+ import messaging from '@react-native-firebase/messaging';
+
+const Stack = createNativeStackNavigator();
+
+
+// Main App Component
+const AppContent: React.FC = () => {
+  const [default_screen, setDefaultScreen] = React.useState<string | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
+  const { theme } = useTheme();
+  
+  React.useEffect(() => {
+    const initializeApp = async () => {
+      await new Promise(resolve => setTimeout(resolve, 4000)); // 4 seconds
+
+      const check_user = await AsyncStorage.getItem('user_details');
+      if (check_user) {
+        const permission =
+          Platform.OS === 'ios'
+            ? PERMISSIONS.IOS.LOCATION_WHEN_IN_USE
+            : PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION;
+        const result = await check(permission);
+        
+        if (result === RESULTS.GRANTED) {
+          setDefaultScreen('DashboardScreen');
+        } else {
+          setDefaultScreen('EnableLocationScreen');
+        }
+      } else {
+        setDefaultScreen('PreLogin');
+      }
+    };
+    
+    initializeApp();
+      //  requestPermission();
+  //  fetchFcmToken();
+    listenForegroundMessages();
+  }, []);
+
+  if (!default_screen) {
+    return <SplashVideo />;
+  }
+
+  // 1. Get FCM Token
+  const fetchFcmToken = async () => {
+    try {
+      const token = await messaging().getToken();
+      console.log("FCM Token:", token);
+    } catch (e) {
+      console.log("FCM token error:", e);
+    }
+  };
+
+  // 2. Listen for foreground messages
+  const listenForegroundMessages = () => {
+    messaging().onMessage(async remoteMessage => {
+      console.log("Foreground:", remoteMessage);
+    });
+  };
+ 
+// React.useEffect(()=>{
+  
+//    // requestPermission();
+//    // getToken();
+//    // handleForeground();
+   
+// },[])
+  return (
+    <SafeAreaProvider>
+      <SafeAreaView 
+        style={{ 
+          flex: 1, 
+          backgroundColor: theme.colors.background.primary 
+        }} 
+        edges={['top', 'left', 'right']}
+      >
+        <NavigationContainer>
+          <Stack.Navigator 
+            initialRouteName={default_screen}  
+            screenOptions={{ 
+              headerShown: false,
+              contentStyle: {
+                backgroundColor: theme.colors.background.primary
+              }
+            }}
+          >
+            <Stack.Screen name="PreLogin" component={PreLoginScreen} />
+            <Stack.Screen name="LoginPhone" component={LoginPhone} />
+            <Stack.Screen name="OTPScreen" component={OTPScreen} />
+            <Stack.Screen name="Support" component={DriverSupport} />
+            <Stack.Screen name="EnableLocationScreen" component={EnableLocationScreen} />
+            <Stack.Screen 
+              name="DashboardScreen" 
+              component={DashboardScreen}
+              initialParams={{ setIsSidebarOpen: setIsSidebarOpen }}
+            />
+            <Stack.Screen 
+              name="NewDashboard" 
+              component={NewDashboard}
+              initialParams={{ setIsSidebarOpen: setIsSidebarOpen }}
+            />
+            
+            <Stack.Screen name="LocationErrorPage" component={LocationErrorPage} />
+            <Stack.Screen name="TrackingScreen" component={TrackingScreen} />
+            <Stack.Screen name="PaymentScreen" component={PaymentScreen} />
+            <Stack.Screen name="SearchingProvider" component={SearchingProvider} />
+            <Stack.Screen name="RideHistoryScreen" component={RideHistoryScreen} />
+            <Stack.Screen name="InvoiceScreen" component={InvoiceScreen} />
+            <Stack.Screen name="FeedbackScreen" component={FeedbackScreen} />
+            <Stack.Screen name="WalletScreen" component={WalletScreen} />
+            <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
+            <Stack.Screen name="HelpScreen" component={HelpScreen} />
+          </Stack.Navigator>
+        </NavigationContainer>
+      </SafeAreaView>
+    </SafeAreaProvider>
+  );
+};
+
+// Root App Component with Theme Provider
+export default function App() {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
+  );
+}

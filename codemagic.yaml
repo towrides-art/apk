@@ -1,0 +1,136 @@
+workflows:
+  ios-workflow:
+    name: iOS Build
+
+    max_build_duration: 60
+
+    environment:
+      xcode: 16.0
+      cocoapods: default
+      node: 18.20.4
+
+      vars:
+        XCODE_PATH: /Applications/Xcode-16.0.app
+        DEVELOPER_DIR: /Applications/Xcode-16.0.app/Contents/Developer
+        RCT_NEW_ARCH_ENABLED: "0"
+        RCT_FABRIC_ENABLED: "0"
+        USE_HERMES: "0"
+
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.towrides.app
+
+    scripts:
+      - name: Remove junk files
+        script: |
+          rm -rf __MACOSX
+
+      - name: Install dependencies
+        script: |
+          rm -rf node_modules
+          npm install --legacy-peer-deps
+          npx patch-package
+
+      - name: Use Xcode 16.0
+        script: |
+          if [ ! -d "$XCODE_PATH" ]; then
+            echo "Xcode not found at $XCODE_PATH" && ls /Applications && exit 1
+          fi
+          sudo xcode-select --switch "$XCODE_PATH"
+          export DEVELOPER_DIR="$DEVELOPER_DIR"
+          "$DEVELOPER_DIR/usr/bin/xcodebuild" -version
+
+      - name: Clean Pods
+        script: |
+          export DEVELOPER_DIR="$DEVELOPER_DIR"
+          rm -rf ~/Library/Developer/Xcode/DerivedData
+          rm -rf ~/Library/Caches/CocoaPods
+          rm -rf ios/build
+          rm -rf ios/build/generated
+          rm -rf ios/Pods
+          rm -rf ios/Podfile.lock
+          rm -rf node_modules
+
+          npm install --legacy-peer-deps
+          npx patch-package
+
+          cd ios
+          pod deintegrate
+          pod cache clean --all
+          pod repo update
+          pod install --repo-update
+
+      - name: Set up code signing
+        script: |
+          xcode-project use-profiles
+
+      - name: Build IPA
+        script: |
+          export DEVELOPER_DIR="$DEVELOPER_DIR"
+          export RCT_NEW_ARCH_ENABLED=0
+          export RCT_FABRIC_ENABLED=0
+          export USE_HERMES=0
+          export RCT_SKIP_CODEGEN=1
+          NODE_BINARY="$(command -v node)"
+          if [ -z "$NODE_BINARY" ]; then
+            echo "Node not found in PATH" && exit 1
+          fi
+          export NODE_BINARY
+          export PATH="$(dirname "$NODE_BINARY"):$PATH"
+
+          cd ios
+
+          cat <<EOF > .xcode.env
+          RCT_NEW_ARCH_ENABLED=0
+          RCT_FABRIC_ENABLED=0
+          RCT_SKIP_CODEGEN=1
+          NODE_BINARY=$NODE_BINARY
+          PATH=$PATH
+          EOF
+
+          cat <<EOF > .xcode.env.local
+          RCT_NEW_ARCH_ENABLED=0
+          RCT_FABRIC_ENABLED=0
+          RCT_SKIP_CODEGEN=1
+          NODE_BINARY=$NODE_BINARY
+          PATH=$PATH
+          EOF
+
+          pod deintegrate
+          rm -rf Pods Podfile.lock build generated
+
+          pod install --repo-update
+
+          cd ..
+
+          mkdir -p /tmp/xcodebuild_logs
+          set -o pipefail
+
+          "$DEVELOPER_DIR/usr/bin/xcodebuild" \
+            -workspace ios/TowRides.xcworkspace \
+            -scheme TowRides \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath ios/build \
+            -destination 'generic/platform=iOS' \
+            clean archive \
+            CODE_SIGNING_ALLOWED=YES \
+            CODE_SIGNING_REQUIRED=YES \
+            -allowProvisioningUpdates \
+            EXCLUDED_ARCHS[sdk=iphonesimulator*]="x86_64 arm64" \
+            2>&1 | tee /tmp/xcodebuild_logs/xcodebuild.log
+
+          status=$?
+          if [ $status -ne 0 ]; then
+            echo "--- xcodebuild error lines ---"
+            grep -n "error:" /tmp/xcodebuild_logs/xcodebuild.log | tail -n 200 || true
+            echo "--- xcodebuild RNCWebViewModule.mm lines ---"
+            grep -n "RNCWebViewModule.mm" /tmp/xcodebuild_logs/xcodebuild.log | tail -n 200 || true
+            echo "--- xcodebuild last 200 lines ---"
+            tail -n 200 /tmp/xcodebuild_logs/xcodebuild.log
+            exit $status
+          fi
+
+    artifacts:
+      - ios/build/**/*.xcarchive
+      - /tmp/xcodebuild_logs/*.log

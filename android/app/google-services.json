@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "776434599894",
+    "project_id": "towrides-7ae76",
+    "storage_bucket": "towrides-7ae76.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:776434599894:android:5165204332908cf0d60677",
+        "android_client_info": {
+          "package_name": "com.towrides"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDu6JdF_C5-NZpiZKr7hv9A3LUcU9nN2nc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:776434599894:android:9e2ccb3a706eaf0ed60677",
+        "android_client_info": {
+          "package_name": "rgdf.dgf"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDu6JdF_C5-NZpiZKr7hv9A3LUcU9nN2nc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

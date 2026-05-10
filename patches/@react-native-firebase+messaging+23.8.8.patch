@@ -1,0 +1,95 @@
+diff --git a/node_modules/@react-native-firebase/messaging/ios/RNFBMessaging/RNFBMessaging+AppDelegate.m b/node_modules/@react-native-firebase/messaging/ios/RNFBMessaging/RNFBMessaging+AppDelegate.m
+index 9c3651d..d568b77 100644
+--- a/node_modules/@react-native-firebase/messaging/ios/RNFBMessaging/RNFBMessaging+AppDelegate.m
++++ b/node_modules/@react-native-firebase/messaging/ios/RNFBMessaging/RNFBMessaging+AppDelegate.m
+@@ -15,7 +15,11 @@
+  *
+  */
+ 
+-#import <Firebase/Firebase.h>
++#import <FirebaseCore/FirebaseCore.h>
++#import <FirebaseMessaging/FirebaseMessaging.h>
++#if __has_include(<FirebaseAuth/FirebaseAuth.h>)
++#import <FirebaseAuth/FirebaseAuth.h>
++#endif
+ #import <GoogleUtilities/GULAppDelegateSwizzler.h>
+ #import <objc/runtime.h>
+ 
+@@ -249,3 +253,4 @@
+ }
+ 
+ @end
++
+diff --git a/node_modules/@react-native-firebase/messaging/ios/RNFBMessaging/RNFBMessaging+FIRMessagingDelegate.h b/node_modules/@react-native-firebase/messaging/ios/RNFBMessaging/RNFBMessaging+FIRMessagingDelegate.h
+index fb83927..2900006 100644
+--- a/node_modules/@react-native-firebase/messaging/ios/RNFBMessaging/RNFBMessaging+FIRMessagingDelegate.h
++++ b/node_modules/@react-native-firebase/messaging/ios/RNFBMessaging/RNFBMessaging+FIRMessagingDelegate.h
+@@ -15,7 +15,7 @@
+  *
+  */
+ 
+-#import <Firebase/Firebase.h>
++#import <FirebaseMessaging/FirebaseMessaging.h>
+ #import <Foundation/Foundation.h>
+ 
+ NS_ASSUME_NONNULL_BEGIN
+@@ -29,3 +29,4 @@ NS_ASSUME_NONNULL_BEGIN
+ @end
+ 
+ NS_ASSUME_NONNULL_END
++
+diff --git a/node_modules/@react-native-firebase/messaging/ios/RNFBMessaging/RNFBMessaging+NSNotificationCenter.m b/node_modules/@react-native-firebase/messaging/ios/RNFBMessaging/RNFBMessaging+NSNotificationCenter.m
+index 1867f14..d57c335 100644
+--- a/node_modules/@react-native-firebase/messaging/ios/RNFBMessaging/RNFBMessaging+NSNotificationCenter.m
++++ b/node_modules/@react-native-firebase/messaging/ios/RNFBMessaging/RNFBMessaging+NSNotificationCenter.m
+@@ -14,7 +14,7 @@
+  * limitations under the License.
+  *
+  */
+-#import <Firebase/Firebase.h>
++#import <FirebaseMessaging/FirebaseMessaging.h>
+ #import <RNFBApp/RNFBJSON.h>
+ #import <RNFBApp/RNFBRCTEventEmitter.h>
+ #import <React/RCTConvert.h>
+@@ -171,3 +171,4 @@
+ }
+ 
+ @end
++
+diff --git a/node_modules/@react-native-firebase/messaging/ios/RNFBMessaging/RNFBMessagingModule.m b/node_modules/@react-native-firebase/messaging/ios/RNFBMessaging/RNFBMessagingModule.m
+index 657ac96..a4044e7 100644
+--- a/node_modules/@react-native-firebase/messaging/ios/RNFBMessaging/RNFBMessagingModule.m
++++ b/node_modules/@react-native-firebase/messaging/ios/RNFBMessaging/RNFBMessagingModule.m
+@@ -15,7 +15,8 @@
+  *
+  */
+ 
+-#import <Firebase/Firebase.h>
++#import <FirebaseCore/FirebaseCore.h>
++#import <FirebaseMessaging/FirebaseMessaging.h>
+ #import <RNFBApp/RNFBSharedUtils.h>
+ #import <React/RCTConvert.h>
+ #import <React/RCTUtils.h>
+@@ -437,3 +438,4 @@ RCT_EXPORT_METHOD(setDeliveryMetricsExportToBigQuery
+ }
+ 
+ @end
++
+diff --git a/node_modules/@react-native-firebase/messaging/ios/RNFBMessaging/RNFBMessagingSerializer.h b/node_modules/@react-native-firebase/messaging/ios/RNFBMessaging/RNFBMessagingSerializer.h
+index 502da9a..7bb23db 100644
+--- a/node_modules/@react-native-firebase/messaging/ios/RNFBMessaging/RNFBMessagingSerializer.h
++++ b/node_modules/@react-native-firebase/messaging/ios/RNFBMessaging/RNFBMessagingSerializer.h
+@@ -15,7 +15,7 @@
+  *
+  */
+ 
+-#import <Firebase/Firebase.h>
++#import <UserNotifications/UserNotifications.h>
+ #import <Foundation/Foundation.h>
+ #import <React/RCTBridgeModule.h>
+ 
+@@ -30,3 +30,4 @@
+ + (NSDictionary *)remoteMessageUserInfoToDict:(NSDictionary *)userInfo;
+ 
+ @end
++

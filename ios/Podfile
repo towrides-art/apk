@@ -1,0 +1,122 @@
+ENV['RCT_NEW_ARCH_ENABLED'] = '0'
+ENV['RCT_SKIP_CODEGEN'] = '1'
+node_binary = ENV['NODE_BINARY']
+if node_binary.nil? || node_binary.empty?
+  node_binary = Pod::Executable.execute_command('which', ['node']).strip
+end
+ENV['NODE_BINARY'] = node_binary
+
+# Required for React Native Firebase with use_frameworks!
+$RNFirebaseAsStaticFramework = true
+
+require Pod::Executable.execute_command('node', ['-p',
+  'require.resolve(
+    "react-native/scripts/react_native_pods.rb",
+    {paths: [process.argv[1]]},
+  )', __dir__]).strip
+
+platform :ios, '15.1'
+prepare_react_native_project!
+
+# Use static frameworks for Firebase Swift support
+use_frameworks! :linkage => :static
+
+target 'TowRides' do
+  config = use_native_modules!
+
+  use_react_native!(
+    :path => config[:reactNativePath],
+    :hermes_enabled => false,
+    :fabric_enabled => false,
+    :new_arch_enabled => false,
+    :production => true,
+    :app_path => "#{Pod::Config.instance.installation_root}/..",
+    :flipper_configuration => FlipperConfiguration.disabled
+  )
+
+  post_install do |installer|
+    react_native_post_install(
+      installer,
+      config[:reactNativePath],
+      :mac_catalyst_enabled => false
+    )
+
+    installer.pods_project.targets.each do |target|
+      # Remove all Fabric-related targets to avoid hash_compile errors
+      if target.name.include?('React-Fabric') ||
+         target.name.include?('React-graphics') ||
+         target.name.include?('React-renderer') ||
+         target.name.include?('React-ImageManager') ||
+         target.name.include?('React-FabricImage') ||
+         target.name.include?('React-RCTFabric') ||
+         target.name.include?('RNPermissions')
+        target.remove_from_project
+      end
+
+      # Remove react-native-safe-area-context due to Xcode 16 incompatibility
+      if target.name.include?('react-native-safe-area-context')
+        target.remove_from_project
+      end
+
+      if target.name == 'React-Codegen'
+        target.build_configurations.each do |config|
+          config.build_settings['NODE_BINARY'] = node_binary
+        end
+      end
+
+      target.build_configurations.each do |config|
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'
+        config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++20'
+        config.build_settings['CLANG_CXX_LIBRARY'] = 'libc++'
+        config.build_settings['GCC_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
+        config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+        config.build_settings['CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER'] = 'NO'
+        preprocessor_defs = Array(config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'])
+        preprocessor_defs << '$(inherited)' if preprocessor_defs.empty?
+        preprocessor_defs.reject! { |definition| definition.to_s.start_with?('RCT_NEW_ARCH_ENABLED') }
+        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] = preprocessor_defs
+        config.build_settings['SWIFT_VERSION'] = '5.0'
+        config.build_settings['SWIFT_OPTIMIZATION_LEVEL'] = '-Onone'
+        config.build_settings['ENABLE_BITCODE'] = 'NO'
+        config.build_settings['ENABLE_USER_SCRIPT_SANDBOXING'] = 'NO'
+
+        # Framework and Swift support for Xcode 16
+        config.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'NO'
+        config.build_settings['DEFINES_MODULE'] = 'YES'
+        config.build_settings['LD_RUNPATH_SEARCH_PATHS'] = '$(inherited) @executable_path/Frameworks @loader_path/Frameworks'
+
+        # Add Swift standard library search paths for Firebase
+        if target.name.include?('Firebase') || target.name.include?('RNFB')
+          config.build_settings['LIBRARY_SEARCH_PATHS'] = '$(inherited) $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(SDKROOT)/usr/lib/swift'
+          config.build_settings['OTHER_LDFLAGS'] = '$(inherited) -ObjC -framework FirebaseAuth -framework FirebaseCore'
+        end
+
+        other_cflags = Array(config.build_settings['OTHER_CFLAGS'])
+        other_cflags << '$(inherited)' if other_cflags.empty?
+        other_cflags << '-Wno-error=non-modular-include-in-framework-module'
+        other_cflags << '-Wno-error=deprecated-objc-isa-usage'
+        other_cflags << '-Wno-error=return-type'
+        config.build_settings['OTHER_CFLAGS'] = other_cflags
+
+        # Add C++ flags for problematic targets
+        if target.name.include?('react-native-simple-toast')
+          other_cflags = Array(config.build_settings['OTHER_CFLAGS'])
+          other_cflags << '$(inherited)' if other_cflags.empty?
+          other_cflags << '-fno-exceptions'
+          other_cflags << '-fno-rtti'
+          config.build_settings['OTHER_CFLAGS'] = other_cflags
+        end
+
+        if target.name == 'RNCAsyncStorage'
+          header_search_paths = Array(config.build_settings['HEADER_SEARCH_PATHS'])
+          header_search_paths << '$(inherited)' if header_search_paths.empty?
+          header_search_paths << '"${PODS_ROOT}/Headers/Public/rnasyncstorage"'
+          header_search_paths << '"${PODS_ROOT}/Headers/Public/React-Codegen"'
+          header_search_paths << '"${PODS_ROOT}/Headers/Public/RNCAsyncStorage"'
+          header_search_paths << '"${PODS_ROOT}/Headers/Public/react-native-async-storage"'
+          config.build_settings['HEADER_SEARCH_PATHS'] = header_search_paths
+        end
+      end
+    end
+  end
+end

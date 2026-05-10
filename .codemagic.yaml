@@ -1,0 +1,66 @@
+workflows:
+  ios-workflow:
+    name: iOS Release Build (Xcode 15.4)
+    max_build_duration: 120
+    environment:
+      xcode: 15.4
+      cocoapods: default
+      node: 18.20.4
+      vars:
+        XCODE_PATH: /Applications/Xcode-15.4.app
+        DEVELOPER_DIR: /Applications/Xcode-15.4.app/Contents/Developer
+    
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+          source: true
+    
+    scripts:
+      - name: Install dependencies
+        script: |
+          npm install --legacy-peer-deps
+
+      - name: Use Xcode 15.4
+        script: |
+          if [ ! -d "$XCODE_PATH" ]; then
+            echo "Xcode not found at $XCODE_PATH" && ls /Applications && exit 1
+          fi
+          sudo xcode-select --switch "$XCODE_PATH"
+          export DEVELOPER_DIR="$DEVELOPER_DIR"
+          "$DEVELOPER_DIR/usr/bin/xcodebuild" -version
+      
+      - name: Install CocoaPods
+        script: |
+          cd ios
+          rm -rf Pods Podfile.lock ~/Library/Developer/Xcode/DerivedData
+          export DEVELOPER_DIR="$DEVELOPER_DIR"
+          pod install --repo-update
+      
+      - name: Build iOS
+        script: |
+          export DEVELOPER_DIR="$XCODE_PATH/Contents/Developer"
+          "$DEVELOPER_DIR/usr/bin/xcodebuild" -workspace TowRides.xcworkspace \
+            -scheme TowRides \
+            -configuration Release \
+            -sdk iphoneos \
+            -archivePath build/TowRides.xcarchive \
+            archive
+      
+      - name: Export IPA
+        script: |
+          export DEVELOPER_DIR="$XCODE_PATH/Contents/Developer"
+          "$DEVELOPER_DIR/usr/bin/xcodebuild" -exportArchive \
+            -archivePath build/TowRides.xcarchive \
+            -exportPath build/ \
+            -exportOptionsPlist exportOptions.plist
+    
+    artifacts:
+      - build/*.ipa
+    
+    publishing:
+      email:
+        recipients:
+          - your-email@example.com

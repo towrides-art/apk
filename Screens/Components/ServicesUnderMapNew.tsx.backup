@@ -1,0 +1,988 @@
+import React, { useEffect, useState } from "react";
+import { Dimensions, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Animated } from "react-native";
+import DropDownPicker from "react-native-dropdown-picker";
+import Modal from "react-native-modal";
+import DestinationSelector from "./DestinationSelector";
+import GarageSelector from "./GarageSelector";
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import CustomSelector from "./CustomSelector";
+import CustomSelectorWithImage from "./CustomSelectorWithImage";
+import Toast from '../../src/utils/toast';
+import ServiceIcon from './ServiceIcons';
+import { useTheme } from '../../src/theme/ThemeProvider';
+import { StyledText, StyledButton, StyledView, Spacer } from '../../src/components/styled';
+import { dimensions } from '../../src/theme/dimensions';
+
+const services = [
+  {
+    name: 'Vehicle Towing',
+    image: require('./asset/tow.jpg'),
+    whereToRequired: false,
+    type: 'tow'
+  },
+];
+
+const ServicesUnderMapNew = ({ navigation, selectedLocation, searchText }: any) => {
+  const { theme } = useTheme();
+  const [tow_model, setTowModel] = useState(false);
+  
+  const openServiceModel = (type: string) => {
+    if (type == 'tow') {
+      setTowModel(true);
+    }
+  }
+  
+  const TowModel = ({ navigation }: any) => {
+    const [Vehicleopen, setVehicleOpen] = useState(false);
+    const [selectedVehicle, SetselectedVehicle] = useState(null);
+    const [vehicles, setVehicles] = useState([
+      { label: 'Bike/Scooter', value: '1' },
+      { label: 'Electric Bike', value: '2' },
+      { label: 'Hatchback', value: '3' },
+      { label: 'Sedan', value: '4' },
+      { label: 'SUV', value: '5' },
+      { label: 'Electric Car', value: '6' },
+      { label: 'Pickup Truck', value: '7' },
+      { label: 'Auto/E-Rickshaw', value: '8' },
+      { label: 'Mini Truck', value: '9' },
+      { label: 'Bus/School Van', value: '10' },
+      { label: 'Tractor/Trolley', value: '11' },
+      { label: 'Luxury Car', value: '12' },
+      { label: 'JCB/Construction', value: '13' },
+    ]);
+    const [tow_open, setTowOpen] = useState(false);
+    const [selected_tow_type, SetselectedTowType] = useState(null);
+    const [selected_where_to, setSelectedWhereTo] = useState('my_destination')
+    const [other_details, set_other_details] = useState('')
+    const [selected_drop_points, set_selected_drop_points] = useState(null)
+    const [tow_types, setTowTypes] = useState([
+      { label: 'Flatbed', value: '1', image: require('./asset/tow_types/1.png'), price: 150 },
+      { label: 'Mini Flatbed', value: '2', image: require('./asset/tow_types/2.png'), price: 120 },
+      { label: 'Heavy Duty Flatbed', value: '3', image: require('./asset/tow_types/2.png'), price: 200 },
+      { label: 'Wheel-lift', value: '4', image: require('./asset/tow_types/4.png'), price: 100 },
+      { label: 'Boom or Heavy Duty Tow Truck', value: '5', image: require('./asset/tow_types/5.png'), price: 250 },
+      { label: 'Rotato', value: '6', image: require('./asset/tow_types/6.png'), price: 180 },
+    ]);
+
+    const [renderTowContent, setRenderTowContent] = useState(false);
+
+    // Price calculation
+    const [totalPrice, setTotalPrice] = useState(0);
+    const [showPriceDetails, setShowPriceDetails] = useState(false);
+    const [showBookingConfirmation, setShowBookingConfirmation] = useState(false);
+
+    // Animation for price section
+    const priceAnimation = new Animated.Value(0);
+    const priceOpacity = new Animated.Value(0);
+
+    // Base prices for different vehicle types
+    const vehicleBasePrices = {
+      '1': 50,   // Bike/Scooter
+      '2': 60,   // Electric Bike
+      '3': 80,   // Hatchback
+      '4': 100,  // Sedan
+      '5': 120,  // SUV
+      '6': 110,  // Electric Car
+      '7': 140,  // Pickup Truck
+      '8': 70,   // Auto/E-Rickshaw
+      '9': 160,  // Mini Truck
+      '10': 200, // Bus/School Van
+      '11': 180, // Tractor/Trolley
+      '12': 150, // Luxury Car
+      '13': 300, // JCB/Construction
+    };
+
+    // Calculate total price when selections change
+    useEffect(() => {
+      console.log('Price calculation triggered:', { selectedVehicle, selected_tow_type });
+
+      let basePrice = 0;
+      let towTypePrice = 0;
+
+      if (selectedVehicle) {
+        basePrice = vehicleBasePrices[selectedVehicle] || 0;
+        console.log('Base price for vehicle', selectedVehicle, ':', basePrice);
+      }
+
+      if (selected_tow_type) {
+        const selectedTowType = tow_types.find(type => type.value === selected_tow_type);
+        towTypePrice = selectedTowType?.price || 0;
+        console.log('Tow type price for', selected_tow_type, ':', towTypePrice);
+      }
+
+      const calculatedPrice = basePrice + towTypePrice;
+      setTotalPrice(calculatedPrice);
+      console.log('Total calculated price:', calculatedPrice);
+
+      // Calculate price but don't show it yet - it will be shown in the next step
+      if (selectedVehicle || selected_tow_type) {
+        console.log('Price calculated:', calculatedPrice);
+        // Don't show price section here - it will be shown in the next step
+      }
+    }, [selectedVehicle, selected_tow_type]);
+
+    useEffect(() => {
+      if (tow_model) {
+        setTimeout(() => {
+          setRenderTowContent(true);
+        }, 50); // Delay just enough to avoid flicker
+      } else {
+        setRenderTowContent(false);
+      }
+    }, [tow_model]);
+
+    // 
+    const [isTowSliding, setIsTowSliding] = useState(false);
+
+    const handleTowSlide = () => {
+      if (!isTowSliding) {
+
+        // optional: add a delay or animation before navigation
+        if (
+          !selected_drop_points ||
+          !selectedLocation ||
+          !selected_tow_type ||
+          !selectedVehicle
+        ) {
+          Toast.show('Please fill all required fields!', Toast.SHORT);
+          return;
+        }
+        
+        // Show price details first
+        setShowPriceDetails(true);
+      }
+    };
+
+    const handleProceedWithBooking = () => {
+      setIsTowSliding(true);
+      setTowModel(false);
+      setTimeout(() => {
+        navigation.navigate('SearchingProvider', {
+          selected_drop_points: selected_drop_points,
+          selectedLocation: selectedLocation,
+          selected_tow_type: selected_tow_type,
+          service_type: 'tow',
+          selectedVehicle: selectedVehicle
+        });
+      }, 300);
+    };
+    // 
+    return (
+      <Modal
+        isVisible={tow_model}
+        onBackdropPress={() => setTowModel(false)}
+        style={{ justifyContent: 'flex-end', margin: 0 }}
+        onBackButtonPress={() => setTowModel(false)}
+      >
+                {renderTowContent ? (
+          <>
+            <View style={[styles.modalContainer, { backgroundColor: theme.colors.surface.primary }]}>
+              {/* Header Section */}
+              <View style={styles.modalHeader}>
+                <StyledText variant="h1" color="primary" style={styles.modalTitle}>
+                  Vehicle Towing Service
+                </StyledText>
+                <StyledText variant="body" color="secondary" style={styles.modalSubtitle}>
+                  Get your vehicle towed safely
+                </StyledText>
+              </View>
+
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: dimensions.spacing.lg3 }}
+              >
+                {!showPriceDetails ? (
+                  // First Stage: Booking Selection
+                  <View style={styles.bookingStage}>
+                    {/* Pick-up Location Card */}
+                    <View style={styles.locationCard}>
+                      <View style={styles.locationHeader}>
+                        <MaterialIcons
+                          name='location-on'
+                          size={24}
+                          color={theme.colors.interactive.primary}
+                        />
+                        <StyledText variant="body" color="primary" weight="medium" style={styles.locationLabel}>
+                          Pick-up Location
+                        </StyledText>
+                      </View>
+                      <TextInput
+                        value={searchText}
+                        readOnly={true}
+                        placeholder="Enter pickup location..."
+                        placeholderTextColor={theme.colors.text.tertiary}
+                        style={styles.locationInput}
+                      />
+                    </View>
+
+                    {/* Drop Location Card */}
+                    <View style={styles.locationCard}>
+                      <GarageSelector 
+                        selectedLocation={selectedLocation} 
+                        selected_drop_points={selected_drop_points} 
+                        set_selected_drop_points={set_selected_drop_points} 
+                      />
+                    </View>
+
+                    {/* Vehicle Selection Card */}
+                    <View style={styles.selectionCard}>
+                      <CustomSelector
+                        selected_value={selectedVehicle}
+                        set_selected_value={SetselectedVehicle}
+                        SelectName="Select Vehicle"
+                        SelectIcon="directions-car-filled"
+                        selecties={vehicles}
+                        style={styles.selectorStyle}
+                      />
+                    </View>
+
+                    {/* Tow Type Selection Card */}
+                    <View style={styles.selectionCard}>
+                      <CustomSelectorWithImage
+                        selected_value={selected_tow_type}
+                        set_selected_value={SetselectedTowType}
+                        SelectName="Select Tow Type"
+                        SelectIcon="fire-truck"
+                        selecties={tow_types}
+                        style={styles.selectorStyle}
+                      />
+                    </View>
+
+                    {/* Photo Upload Card */}
+                    <TouchableOpacity style={styles.uploadCard}>
+                      <View style={styles.uploadHeader}>
+                        <MaterialIcons
+                          name='camera-alt'
+                          size={24}
+                          color={theme.colors.interactive.primary}
+                        />
+                        <StyledText variant="body" color="primary" weight="medium" style={styles.uploadLabel}>
+                          Upload Photo
+                        </StyledText>
+                      </View>
+                      <StyledText variant="caption" color="tertiary" style={styles.uploadOptional}>
+                        (optional)
+                      </StyledText>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  // Second Stage: Price Details
+                  <View style={styles.priceStage}>
+                    {/* Selected Vehicle Display */}
+                    {selectedVehicle && (
+                      <View style={styles.selectedVehicleCard}>
+                        <View style={styles.vehicleInfo}>
+                          <View style={styles.vehicleIcon}>
+                            <MaterialIcons
+                              name='directions-car-filled'
+                              size={32}
+                              color={theme.colors.interactive.primary}
+                            />
+                          </View>
+                          <View style={styles.vehicleDetails}>
+                            <StyledText variant="body" color="primary" weight="bold" style={styles.vehicleName}>
+                              {vehicles.find(v => v.value === selectedVehicle)?.label}
+                            </StyledText>
+                            <StyledText variant="caption" color="secondary" style={styles.vehicleType}>
+                              Selected Vehicle
+                            </StyledText>
+                          </View>
+                        </View>
+                      </View>
+                    )}
+
+                    {/* Selected Tow Type Display */}
+                    {selected_tow_type && (
+                      <View style={styles.selectedTowCard}>
+                        <View style={styles.towInfo}>
+                          <View style={styles.towImageContainer}>
+                            <Image
+                              source={tow_types.find(t => t.value === selected_tow_type)?.image}
+                              style={styles.towImage}
+                              resizeMode="contain"
+                            />
+                          </View>
+                          <View style={styles.towDetails}>
+                            <StyledText variant="body" color="primary" weight="bold" style={styles.towName}>
+                              {tow_types.find(t => t.value === selected_tow_type)?.label}
+                            </StyledText>
+                            <StyledText variant="caption" color="secondary" style={styles.towType}>
+                              Selected Tow Service
+                            </StyledText>
+                          </View>
+                        </View>
+                      </View>
+                    )}
+
+                    <View style={styles.priceCard}>
+                      <View style={styles.priceHeader}>
+                        <StyledText variant="h2" color="primary" weight="bold" style={styles.priceTitle}>
+                          Total Price
+                        </StyledText>
+                      </View>
+                      
+                      <View style={styles.priceBreakdown}>
+                        <View style={styles.priceRow}>
+                          <StyledText variant="body" color="secondary" style={styles.priceLabel}>
+                            Base Price:
+                          </StyledText>
+                          <StyledText variant="body" color="primary" weight="medium" style={styles.priceValue}>
+                            ₹{String(selectedVehicle ? vehicleBasePrices[selectedVehicle] || 0 : 0)}
+                          </StyledText>
+                        </View>
+                        
+                        {selected_tow_type && (
+                          <View style={styles.priceRow}>
+                            <StyledText variant="body" color="secondary" style={styles.priceLabel}>
+                              Tow Type:
+                            </StyledText>
+                            <StyledText variant="body" color="primary" weight="medium" style={styles.priceValue}>
+                              ₹{String(tow_types.find(type => type.value === selected_tow_type)?.price || 0)}
+                            </StyledText>
+                          </View>
+                        )}
+                        
+                        <View style={styles.priceDivider} />
+                        
+                        <View style={styles.totalRow}>
+                          <StyledText variant="h3" color="primary" weight="bold" style={styles.totalLabel}>
+                            Total:
+                          </StyledText>
+                          <StyledText variant="h2" color="primary" weight="bold" style={styles.totalValue}>
+                            ₹{String(totalPrice)}
+                          </StyledText>
+                        </View>
+                      </View>
+                    </View>
+                  </View>
+                )}
+              </ScrollView>
+
+              {/* Bottom Action Button */}
+              {!showPriceDetails ? (
+                <TouchableOpacity
+                  style={[styles.bookButton, { backgroundColor: theme.colors.interactive.primary }]}
+                  onPress={handleTowSlide}
+                  activeOpacity={0.8}
+                >
+                  <StyledText variant="button" color="inverse" weight="medium" style={styles.bookButtonText}>
+                    Next
+                  </StyledText>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={[styles.proceedButton, { backgroundColor: theme.colors.interactive.primary }]}
+                  onPress={handleProceedWithBooking}
+                  activeOpacity={0.8}
+                >
+                  <StyledText variant="button" color="inverse" weight="medium" style={styles.proceedButtonText}>
+                    Proceed with Booking
+                  </StyledText>
+                </TouchableOpacity>
+              )}
+            </View>
+          </>
+        ) : (
+          <>
+
+          </>
+        )}
+
+      </Modal>
+    )
+  }
+
+  return (
+    <>
+      <StyledView style={{
+        ...styles.maincontainer,
+        backgroundColor: theme.colors.surface.primary
+      }}>
+        <TowModel navigation={navigation} />
+        
+        {/* Main Service Request Section */}
+        <View style={styles.serviceRequestContainer}>
+          {/* Request Tow Button */}
+          <TouchableOpacity 
+            style={[styles.requestTowButton, { backgroundColor: theme.colors.interactive.primary }]}
+            activeOpacity={0.8} 
+            onPress={() => openServiceModel('tow')}
+          >
+            <StyledText variant="button" color="inverse" weight="bold" style={styles.requestTowText}>
+              Request Tow
+            </StyledText>
+          </TouchableOpacity>
+          
+          {/* Next Step Indicator */}
+          {/* <View style={styles.nextStepContainer}>
+            <StyledText variant="body" color="primary" style={styles.nextStepText}>
+              Next  Choose Service
+            </StyledText>
+          </View> */}
+          
+          {/* Where are you stuck section */}
+          {/* <TouchableOpacity 
+            style={[styles.whereStuckContainer, { 
+              backgroundColor: theme.colors.surface.secondary,
+              borderColor: theme.colors.border.secondary 
+            }]}
+            activeOpacity={0.8}
+            onPress={() => openServiceModel('tow')}
+          >
+            <View style={styles.whereStuckContent}>
+              <MaterialIcons
+                name="location-on"
+                size={24}
+                color={theme.colors.interactive.primary}
+              />
+              <StyledText variant="body" color="primary" style={styles.whereStuckText}>
+                Where are you stuck?
+              </StyledText>
+              <MaterialIcons
+                style={{marginTop: dimensions.spacing.lg4}}
+                name="chevron-right"
+                size={24}
+                color={theme.colors.interactive.primary}
+              />
+            </View>
+          </TouchableOpacity> */}
+        </View>
+      </StyledView>
+    </>
+  );
+}
+
+const styles = StyleSheet.create({
+  maincontainer: {
+    display: 'flex',
+    width: '100%',
+    borderTopLeftRadius:50,
+    borderTopRightRadius:50,
+    left: 0,
+    position: 'absolute',
+    bottom: 0,
+    elevation: 20,
+    paddingBottom: dimensions.spacing.lg2,
+  },
+  
+  // Service Request Section Styles
+  serviceRequestContainer: {
+    paddingHorizontal: dimensions.spacing.lg2,
+    paddingBottom: dimensions.spacing.lg2,
+    alignItems: 'center',
+  },
+  requestTowButton: {
+    borderRadius: 100,
+    padding: dimensions.spacing.md4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: dimensions.spacing.sm,
+    marginTop: dimensions.spacing.lg4,
+    width: '100%',
+    maxWidth: 300,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  requestTowText: {
+    fontWeight: 'bold',
+    textAlign: 'center',
+    fontSize: 18,
+  },
+  nextStepContainer: {
+    marginBottom: dimensions.spacing.sm,
+  },
+  nextStepText: {
+    fontWeight: 'bold',
+    textAlign: 'center',
+    fontSize: 16,
+  },
+  whereStuckContainer: {
+    borderRadius: dimensions.layout.borderRadius.lg,
+    padding: dimensions.spacing.md,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    maxWidth: 300,
+  },
+  whereStuckContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  whereStuckText: {
+    flex: 1,
+    marginLeft: dimensions.spacing.sm,
+  },
+  
+  // Modal Styles
+  modalContainer: {
+    padding: dimensions.spacing.lg2,
+    borderTopRightRadius: dimensions.layout.borderRadius.xl,
+    borderTopLeftRadius: dimensions.layout.borderRadius.xl,
+    minHeight: '80%',
+  },
+  modalHeader: {
+    marginBottom: dimensions.spacing.lg2,
+    alignItems: 'center',
+  },
+  modalTitle: {
+    marginBottom: dimensions.spacing.xs,
+    textAlign: 'center',
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  modalSubtitle: {
+    textAlign: 'center',
+    color: '#666',
+  },
+  
+  // Booking Stage Styles
+  bookingStage: {
+    gap: dimensions.spacing.md,
+  },
+  locationCard: {
+    backgroundColor: 'white',
+    borderRadius: dimensions.layout.borderRadius.lg,
+    padding: dimensions.spacing.sm,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  locationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    // marginBottom: dimensions.spacing.sm,
+    gap: dimensions.spacing.sm,
+  },
+  locationLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  locationInput: {
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: dimensions.layout.borderRadius.md,
+    padding: dimensions.spacing.md,
+    fontSize: 16,
+    color: '#333',
+  },
+  
+  // Selection Card Styles
+  selectionCard: {
+    backgroundColor: 'white',
+    borderRadius: dimensions.layout.borderRadius.lg,
+    padding: dimensions.spacing.md,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  selectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: dimensions.spacing.sm,
+    gap: dimensions.spacing.sm,
+  },
+  selectionLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  selectorStyle: {
+    backgroundColor: 'white',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  
+  // Upload Card Styles
+  uploadCard: {
+    backgroundColor: 'white',
+    borderRadius: dimensions.layout.borderRadius.lg,
+    padding: dimensions.spacing.md,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  uploadHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: dimensions.spacing.xs,
+    gap: dimensions.spacing.sm,
+  },
+  uploadLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  uploadOptional: {
+    fontSize: 14,
+    color: '#666',
+  },
+  
+  // Price Stage Styles
+  priceStage: {
+    gap: dimensions.spacing.md,
+  },
+  priceCard: {
+    backgroundColor: 'white',
+    borderRadius: dimensions.layout.borderRadius.lg,
+    padding: dimensions.spacing.lg,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  priceBreakdown: {
+    gap: dimensions.spacing.md,
+  },
+  totalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    // marginTop: dimensions.spacing.sm,
+  },
+  totalLabel: {
+    fontSize: 18,
+  },
+  totalValue: {
+    fontSize: 24,
+  },
+  
+  // Selected Vehicle and Tow Type Display Styles
+  selectedVehicleCard: {
+    backgroundColor: 'white',
+    borderRadius: dimensions.layout.borderRadius.lg,
+    padding: dimensions.spacing.md,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    marginBottom: dimensions.spacing.md,
+  },
+  vehicleInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: dimensions.spacing.md,
+  },
+  vehicleIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#f8f9fa',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  vehicleDetails: {
+    flex: 1,
+  },
+  vehicleName: {
+    fontSize: 16,
+    marginBottom: dimensions.spacing.xs,
+  },
+  vehicleType: {
+    fontSize: 14,
+    color: '#666',
+  },
+  
+  selectedTowCard: {
+    backgroundColor: 'white',
+    borderRadius: dimensions.layout.borderRadius.lg,
+    padding: dimensions.spacing.md,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    marginBottom: dimensions.spacing.md,
+  },
+  towInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: dimensions.spacing.md,
+  },
+  towImageContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    backgroundColor: '#f8f9fa',
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  towImage: {
+    width: '100%',
+    height: '100%',
+  },
+  towDetails: {
+    flex: 1,
+  },
+  towName: {
+    fontSize: 16,
+    marginBottom: dimensions.spacing.xs,
+  },
+  towType: {
+    fontSize: 14,
+    color: '#666',
+  },
+  
+  // Form Field Styles
+  searchBox: {
+    position: 'relative',
+    justifyContent: 'center',
+    paddingTop: dimensions.spacing.sm,
+  },
+  fieldLabel: {
+    marginBottom: dimensions.spacing.xs3,
+  },
+  inputWithClear: {
+    borderRadius: dimensions.layout.borderRadius.md,
+    padding: dimensions.spacing.md3,
+    paddingRight: dimensions.spacing.xl,
+    marginBottom: dimensions.spacing.md3,
+    borderWidth: 1,
+  },
+  textInput: {
+    borderWidth: 1,
+    borderRadius: dimensions.layout.borderRadius.md,
+    padding: dimensions.spacing.md3,
+    paddingRight: dimensions.spacing.xl,
+    marginBottom: dimensions.spacing.md3,
+  },
+  
+  // Tow Model Specific Styles
+  locationInputContainer: {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: dimensions.layout.borderRadius.md,
+    padding: dimensions.spacing.md3,
+    justifyContent: 'space-between',
+    paddingHorizontal: dimensions.spacing.sm4,
+    marginBottom: dimensions.spacing.md3,
+  },
+  locationIconContainer: {
+    display: "flex",
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    flex: 1,
+  },
+  locationIcon: {
+    margin: dimensions.spacing.xs3,
+    borderRadius: 20,
+    fontWeight: 'bold',
+  },
+  locationLabel: {
+    marginLeft: dimensions.spacing.xs3,
+  },
+  locationInput: {
+    textAlign: 'right',
+    flex: 1,
+  },
+  
+  photoUploadContainer: {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: dimensions.spacing.sm,
+    borderRadius: dimensions.layout.borderRadius.md,
+    padding: dimensions.spacing.md3,
+    justifyContent: 'space-between',
+    paddingHorizontal: dimensions.spacing.sm4,
+    marginBottom: dimensions.spacing.md3,
+  },
+  photoUploadIconContainer: {
+    display: "flex",
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+  },
+  photoUploadIcon: {
+    margin: dimensions.spacing.xs3,
+    borderRadius: 20,
+    fontWeight: 'bold',
+  },
+  photoUploadLabel: {
+    marginLeft: dimensions.spacing.xs3,
+  },
+  photoUploadOptional: {
+    fontWeight: '400',
+  },
+  
+  bookButton: {
+    borderRadius: dimensions.layout.borderRadius.lg,
+    padding: dimensions.spacing.md4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: dimensions.spacing.sm,
+    marginHorizontal: dimensions.spacing.lg2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  bookButtonText: {
+    fontWeight: 'bold',
+    textAlign: 'center',
+    fontSize: 18,
+  },
+  
+  // Service Selection Styles (for Tyre)
+  serviceSelectionContainer: {
+    display: 'flex',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: dimensions.spacing.md3,
+  },
+  serviceOption: {
+    width: '48%',
+    alignItems: 'center',
+    borderWidth: 1,
+    padding: dimensions.spacing.sm2,
+    borderRadius: dimensions.layout.borderRadius.md,
+  },
+  serviceOptionText: {
+    textAlign: 'center',
+  },
+  
+  // Fuel Litre Options Styles
+  litreOptionsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: dimensions.spacing.sm,
+    marginBottom: dimensions.spacing.md3,
+  },
+  litreOption: {
+    width: '48%',
+    marginBottom: dimensions.spacing.sm,
+    padding: dimensions.spacing.md3,
+    alignItems: 'center',
+    borderRadius: dimensions.layout.borderRadius.md,
+    borderWidth: 1,
+  },
+  litreOptionText: {
+    textAlign: 'center',
+  },
+  
+  // Price Section Styles
+  priceSection: {
+    borderRadius: dimensions.layout.borderRadius.md,
+    padding: dimensions.spacing.lg2,
+    marginTop: dimensions.spacing.md3,
+    marginBottom: dimensions.spacing.md3,
+    borderWidth: 1,
+  },
+  priceHeader: {
+    marginBottom: dimensions.spacing.md3,
+  },
+  priceTitle: {
+    textAlign: 'center',
+  },
+  priceDetails: {
+    gap: dimensions.spacing.sm,
+  },
+  priceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  priceLabel: {
+  },
+  priceValue: {
+    fontWeight: '600',
+  },
+  priceDivider: {
+    // height: 1,
+    // marginVertical: dimensions.spacing.xs3,
+  },
+  totalPriceLabel: {
+    fontWeight: 'bold',
+  },
+  totalPriceValue: {
+    fontWeight: 'bold',
+  },
+  
+  // Price Details Container Styles
+  priceDetailsContainer: {
+    paddingBottom: dimensions.spacing.lg2,
+  },
+  proceedButton: {
+    borderRadius: dimensions.layout.borderRadius.lg,
+    padding: dimensions.spacing.md4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: dimensions.spacing.lg2,
+    marginHorizontal: dimensions.spacing.lg2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  proceedButtonText: {
+    fontWeight: 'bold',
+    textAlign: 'center',
+    fontSize: 18,
+    color: 'white',
+  },
+  
+  // Slider Styles
+  sliderContainer: {
+    paddingBottom: dimensions.spacing.lg2,
+  },
+  sliderChildrenContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
+  },
+  sliderContainerStyle: {
+    margin: dimensions.spacing.md3,
+    borderRadius: dimensions.layout.borderRadius.md,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    padding: dimensions.spacing.md3,
+  },
+  sliderIcon: {
+    borderWidth: 4,
+    margin: dimensions.spacing.xs3,
+    borderRadius: 20,
+  },
+  sliderText: {
+    textAlign: 'center',
+  },
+
+});
+
+export default ServicesUnderMapNew;
