@@ -105,6 +105,11 @@ workflows:
             echo "ERROR: react-native not found in node_modules!" && exit 1
           fi
 
+          # NEW: Run pre-build setup script (aggressive patching)
+          echo "Running pre-build setup..."
+          chmod +x ios/build_patch/pre_build.sh 2>/dev/null || true
+          bash ios/build_patch/pre_build.sh || echo "Pre-build script had warnings but continuing..."
+          
           # Clean any previous build artifacts
           rm -rf ios/build ios/build_patch
           mkdir -p ios/build_patch
