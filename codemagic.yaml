@@ -265,6 +265,15 @@ EOF
             sed -i '' 's/GCC_WARN_INHIBIT_ALL_WARNINGS = NO/GCC_WARN_INHIBIT_ALL_WARNINGS = YES/g' Pods/Pods.xcodeproj/project.pbxproj 2>/dev/null || true
           fi
           
+          # === PATCH .resp files (response files) that contain compiler flags ===
+          echo "=== Patching .resp files to remove -Werror ==="
+          find build -name "*.resp" -type f 2>/dev/null | while read respfile; do
+            echo "Patching resp: $respfile"
+            sed -i.bak 's/-Werror[^[:space:]]*/ /g' "$respfile" 2>/dev/null || true
+            sed -i.bak 's/-Werror=[^[:space:]]*/ /g' "$respfile" 2>/dev/null || true
+          done || true
+          echo "[OK] .resp files patched"
+          
           # === CRITICAL FIX: Create dummy Swift header for FirebaseAuth ===
           echo "=== Creating dummy FirebaseAuth-Swift.h ==="
           mkdir -p "Pods/Headers/Private/FirebaseAuth"
