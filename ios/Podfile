@@ -9,6 +9,9 @@ ENV['NODE_BINARY'] = node_binary
 # Required for React Native Firebase with use_frameworks!
 $RNFirebaseAsStaticFramework = true
 
+# Mark specific pods as static frameworks
+$static_framework = ['RNFBApp', 'RNFBAuth', 'RNFBMessaging', 'FirebaseAuth', 'FirebaseCore', 'FirebaseCoreInternal', 'FirebaseInstallations', 'FirebaseMessaging', 'GoogleUtilities', 'GTMSessionFetcher', 'PromisesObjC']
+
 require Pod::Executable.execute_command('node', ['-p',
   'require.resolve(
     "react-native/scripts/react_native_pods.rb",
@@ -20,6 +23,17 @@ prepare_react_native_project!
 
 # Use static frameworks for Firebase Swift support
 use_frameworks! :linkage => :static
+
+# Pre-install hook to mark pods as static frameworks
+pre_install do |installer|
+  installer.pod_targets.each do |pod|
+    if $static_framework.include?(pod.name)
+      def pod.build_type
+        Pod::BuildType.static_library
+      end
+    end
+  end
+end
 
 target 'TowRides' do
   config = use_native_modules!
@@ -88,7 +102,17 @@ target 'TowRides' do
         # Add Swift standard library search paths for Firebase
         if target.name.include?('Firebase') || target.name.include?('RNFB')
           config.build_settings['LIBRARY_SEARCH_PATHS'] = '$(inherited) $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(SDKROOT)/usr/lib/swift'
-          config.build_settings['OTHER_LDFLAGS'] = '$(inherited) -ObjC -framework FirebaseAuth -framework FirebaseCore'
+        end
+
+        # Add header search paths for RNFirebase pods
+        if target.name.include?('RNFB')
+          header_search_paths = Array(config.build_settings['HEADER_SEARCH_PATHS'])
+          header_search_paths << '$(inherited)' if header_search_paths.empty?
+          header_search_paths << '"${PODS_ROOT}/Headers/Public/Firebase"'
+          header_search_paths << '"${PODS_ROOT}/Firebase/CoreOnly/Sources"'
+          header_search_paths << '"${PODS_ROOT}/FirebaseAuth/FirebaseAuth/Sources"'
+          config.build_settings['HEADER_SEARCH_PATHS'] = header_search_paths
+          config.build_settings['FRAMEWORK_SEARCH_PATHS'] = '$(inherited) "${PODS_CONFIGURATION_BUILD_DIR}/FirebaseAuth" "${PODS_CONFIGURATION_BUILD_DIR}/FirebaseCore"'
         end
 
         other_cflags = Array(config.build_settings['OTHER_CFLAGS'])

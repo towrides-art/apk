@@ -113,11 +113,14 @@ workflows:
             -sdk iphoneos \
             -derivedDataPath ios/build \
             -destination 'generic/platform=iOS' \
+            -UseModernBuildSystem=YES \
+            -onlyUsePackageVersionsFromResolvedFile \
             clean archive \
             CODE_SIGNING_ALLOWED=YES \
             CODE_SIGNING_REQUIRED=YES \
             -allowProvisioningUpdates \
             EXCLUDED_ARCHS[sdk=iphonesimulator*]="x86_64 arm64" \
+            SWIFT_VERSION=5.0 \
             2>&1 | tee /tmp/xcodebuild_logs/xcodebuild.log
 
           status=$?
