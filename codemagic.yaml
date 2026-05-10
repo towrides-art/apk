@@ -386,21 +386,28 @@ workflows:
                 echo "ULTRA patching: $config_file"
                 # First, BACKUP the original
                 cp "$config_file" "$config_file.backup" 2>/dev/null || true
-                # Then TRUNCATE and rewrite with only safe settings
+                # Then TRUNCATE and rewrite with safe settings + Swift module support
                 cat > "$config_file" <<PODCONFIG
-          // COMPLETELY REWRITTEN - ALL WARNINGS DISABLED
+          // COMPLETELY REWRITTEN - ALL WARNINGS DISABLED + SWIFT SUPPORT
           GCC_TREAT_WARNINGS_AS_ERRORS = NO
           SWIFT_TREAT_WARNINGS_AS_ERRORS = NO
           GCC_WARN_INHIBIT_ALL_WARNINGS = YES
           WARNING_CFLAGS = -w
           OTHER_CFLAGS = -w
           OTHER_SWIFT_FLAGS = -w
-          CLANG_ENABLE_MODULES = NO
-          DEFINES_MODULE = NO
+          // CRITICAL: Enable modules for Swift header support
+          CLANG_ENABLE_MODULES = YES
+          DEFINES_MODULE = YES
+          CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES = YES
+          // Header search paths for Swift generated headers
+          HEADER_SEARCH_PATHS = $(inherited) "${PODS_CONFIGURATION_BUILD_DIR}/FirebaseAuth/FirebaseAuth.framework/Headers" "${PODS_CONFIGURATION_BUILD_DIR}/FirebaseCore/FirebaseCore.framework/Headers" "${PODS_CONFIGURATION_BUILD_DIR}/FirebaseMessaging/FirebaseMessaging.framework/Headers" "${PODS_CONFIGURATION_BUILD_DIR}/FirebaseInstallations/FirebaseInstallations.framework/Headers"
+          // Framework search paths
+          FRAMEWORK_SEARCH_PATHS = $(inherited) "${PODS_CONFIGURATION_BUILD_DIR}/FirebaseAuth" "${PODS_CONFIGURATION_BUILD_DIR}/FirebaseCore" "${PODS_CONFIGURATION_BUILD_DIR}/FirebaseMessaging" "${PODS_CONFIGURATION_BUILD_DIR}/FirebaseInstallations" "${PODS_CONFIGURATION_BUILD_DIR}/GoogleUtilities" "${PODS_CONFIGURATION_BUILD_DIR}/GTMSessionFetcher"
           PODCONFIG
                 # Append the original inherits but cleaned
                 echo "POD_CONFIGURATION_RELEASE = 1" >> "$config_file"
                 echo "POD_CONFIGURATION_DEBUG = 1" >> "$config_file"
+                echo "USE_HEADERMAP = NO" >> "$config_file"
               fi
             done
           done
