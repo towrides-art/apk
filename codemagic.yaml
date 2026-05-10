@@ -446,6 +446,8 @@ EOF
           export RCT_FABRIC_ENABLED=0
           export USE_HERMES=0
           export RCT_SKIP_CODEGEN=1
+          export OTHER_CFLAGS="-w"
+          export WARNING_CFLAGS="-w"
           NODE_BINARY="$(command -v node)"
           if [ -z "$NODE_BINARY" ]; then
             echo "Node not found in PATH" && exit 1
@@ -1595,6 +1597,7 @@ ULTRAEND
             CLANG_WARN_NULLABLE_TO_NONNULL_CONVERSION=NO \
             CLANG_ANALYZER_NONNULL=NO \
             RUN_CLANG_STATIC_ANALYZER=NO \
+            OTHER_CFLAGS="-w" \
             2>&1 | tee /tmp/xcodebuild_logs/xcodebuild.log
 
           # Kill all background patchers
