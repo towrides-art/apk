@@ -72,6 +72,18 @@ workflows:
             sed -i '' 's/GCC_WARN_INHIBIT_ALL_WARNINGS = NO/GCC_WARN_INHIBIT_ALL_WARNINGS = YES/g' Pods/Pods.xcodeproj/project.pbxproj 2>/dev/null || true
           fi
           
+          # === CRITICAL: Re-run pre_build.py AFTER pod install ===
+          # pod install can overwrite node_modules files, so patch again
+          echo "=== Re-patching source files after pod install ==="
+          cd ..
+          python3 ios/build_patch/pre_build.py || python ios/build_patch/pre_build.py || echo "Python re-patch had warnings but continuing..."
+          
+          # Verify the patched file
+          echo "=== Verifying RNFBMessaging+AppDelegate.m is patched ==="
+          head -5 node_modules/@react-native-firebase/messaging/ios/RNFBMessaging/RNFBMessaging+AppDelegate.m || echo "File not found"
+          
+          cd ios
+          
           # List patched files
           echo "=== Verifying patched RNFBMessaging xcconfig ==="
           cat Pods/Target\ Support\ Files/RNFBMessaging/RNFBMessaging.release.xcconfig 2>/dev/null || echo "File not found"

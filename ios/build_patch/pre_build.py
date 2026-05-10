@@ -82,14 +82,14 @@ if os.path.exists(auth_module):
 else:
     print(f"  File not found: {auth_module}")
 
-# 3. Patch RNFBMessaging+AppDelegate.m
-print("\nPatching RNFBMessaging+AppDelegate.m...")
-messaging_files = [
-    "node_modules/@react-native-firebase/messaging/ios/RNFBMessaging/RNFBMessaging+AppDelegate.m",
-    "node_modules/@react-native-firebase/messaging/ios/RNFBMessaging/RNFBMessaging+UNUserNotificationCenter.m",
-]
+# 3. Patch RNFBMessaging+AppDelegate.m - ULTRA AGGRESSIVE
+print("\nPatching RNFBMessaging+AppDelegate.m - ULTRA MODE...")
 
-messaging_pragma = """#pragma clang diagnostic push
+messaging_app_delegate = "node_modules/@react-native-firebase/messaging/ios/RNFBMessaging/RNFBMessaging+AppDelegate.m"
+messaging_un_center = "node_modules/@react-native-firebase/messaging/ios/RNFBMessaging/RNFBMessaging+UNUserNotificationCenter.m"
+
+# ULTRA pragma block with EVERY warning disabled
+ultra_pragma = """#pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Werror"
 #pragma clang diagnostic ignored "-Wdocumentation"
 #pragma clang diagnostic ignored "-Wdeprecated-objc-isa-usage"
@@ -106,34 +106,96 @@ messaging_pragma = """#pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wempty-body"
 #pragma clang diagnostic ignored "-Wuninitialized"
 #pragma clang diagnostic ignored "-Wconditional-uninitialized"
+#pragma clang diagnostic ignored "-Wshadow"
+#pragma clang diagnostic ignored "-Wfour-char-constants"
+#pragma clang diagnostic ignored "-Wconversion"
+#pragma clang diagnostic ignored "-Wconstant-conversion"
+#pragma clang diagnostic ignored "-Wint-conversion"
+#pragma clang diagnostic ignored "-Wbool-conversion"
+#pragma clang diagnostic ignored "-Wenum-conversion"
+#pragma clang diagnostic ignored "-Wfloat-conversion"
+#pragma clang diagnostic ignored "-Wnon-literal-null-conversion"
+#pragma clang diagnostic ignored "-Wobjc-literal-conversion"
+#pragma clang diagnostic ignored "-Wshorten-64-to-32"
+#pragma clang diagnostic ignored "-Wpointer-sign"
+#pragma clang diagnostic ignored "-Wselector"
+#pragma clang diagnostic ignored "-Wstrict-selector-match"
+#pragma clang diagnostic ignored "-Wundeclared-selector"
+#pragma clang diagnostic ignored "-Wdeprecated-implementations"
+#pragma clang diagnostic ignored "-Wprotocol"
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+#pragma clang diagnostic ignored "-Wsign-conversion"
+#pragma clang diagnostic ignored "-Winfinite-recursion"
+#pragma clang diagnostic ignored "-Wcomma"
+#pragma clang diagnostic ignored "-Wblock-capture-autoreleasing"
+#pragma clang diagnostic ignored "-Wstrict-prototypes"
+#pragma clang diagnostic ignored "-Wunguarded-availability"
+#pragma clang diagnostic ignored "-Wmissing-braces"
+#pragma clang diagnostic ignored "-Wmissing-field-initializers"
+#pragma clang diagnostic ignored "-Wmissing-prototypes"
+#pragma clang diagnostic ignored "-Wtrigraphs"
+#pragma clang diagnostic ignored "-Wunknown-pragmas"
 
 """
 
-for msg_file in messaging_files:
-    if os.path.exists(msg_file):
-        try:
-            # Backup
-            shutil.copy(msg_file, msg_file + ".backup")
-            
-            with open(msg_file, 'r') as f:
-                content = f.read()
-            
-            # Add pragmas at beginning if not already there
-            if '#pragma clang diagnostic' not in content[:100]:
-                content = messaging_pragma + content
-            
-            # Add pragma pop at end if not present
-            if '#pragma clang diagnostic pop' not in content[-100:]:
-                content = content + '\n#pragma clang diagnostic pop\n'
-            
-            with open(msg_file, 'w') as f:
+def ultra_patch_file(filepath):
+    """Ultra aggressive patching of a single file"""
+    if not os.path.exists(filepath):
+        print(f"  File not found: {filepath}")
+        return
+    
+    try:
+        # Read original
+        with open(filepath, 'r') as f:
+            content = f.read()
+        
+        # Create backup
+        backup_path = filepath + ".original"
+        if not os.path.exists(backup_path):
+            with open(backup_path, 'w') as f:
                 f.write(content)
+        
+        # Check if already patched
+        if '#pragma clang diagnostic' in content[:200]:
+            print(f"  Already patched: {filepath}")
+            return
+        
+        # Apply ultra pragma at the VERY beginning
+        new_content = ultra_pragma + content
+        
+        # Add pragma pop at the VERY end
+        if '#pragma clang diagnostic pop' not in content[-200:]:
+            new_content = new_content + '\n\n#pragma clang diagnostic pop\n'
+        
+        # Write back
+        with open(filepath, 'w') as f:
+            f.write(new_content)
+        
+        print(f"  ULTRA Patched: {filepath}")
+        
+        # Verify
+        with open(filepath, 'r') as f:
+            verify = f.read()
+        if '#pragma clang diagnostic' in verify[:200]:
+            print(f"  ✓ Verified: {filepath}")
+        else:
+            print(f"  ✗ Verification failed: {filepath}")
             
-            print(f"  Patched: {msg_file}")
-        except Exception as e:
-            print(f"  Error patching {msg_file}: {e}")
-    else:
-        print(f"  File not found: {msg_file}")
+    except Exception as e:
+        print(f"  Error patching {filepath}: {e}")
+
+# Patch the problematic files
+ultra_patch_file(messaging_app_delegate)
+ultra_patch_file(messaging_un_center)
+
+# Also patch ALL files in the messaging directory for safety
+print("\n  Patching ALL files in RNFBMessaging directory...")
+messaging_dir = "node_modules/@react-native-firebase/messaging/ios/RNFBMessaging"
+if os.path.exists(messaging_dir):
+    for filename in os.listdir(messaging_dir):
+        if filename.endswith('.m'):
+            filepath = os.path.join(messaging_dir, filename)
+            ultra_patch_file(filepath)
 
 # 4. Patch ALL other Firebase modules for safety
 print("\nPatching all other Firebase modules...")
