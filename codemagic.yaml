@@ -114,7 +114,26 @@ workflows:
           CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = NO
           CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES = YES
           GCC_WARN_INHIBIT_ALL_WARNINGS = YES
+          MTL_ENABLE_DEBUG_INFO = NO
+          ENABLE_BITCODE = NO
+          SWIFT_VERSION = 5.0
+          IPHONEOS_DEPLOYMENT_TARGET = 15.1
           XCCONFIG
+
+          # Create workspace settings to use legacy build system
+          mkdir -p ios/TowRides.xcworkspace/xcshareddata/WorkspaceSettings
+          cat <<'WKST' > ios/TowRides.xcworkspace/xcshareddata/WorkspaceSettings/WorkspaceSettings.xcsettings
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+          	<key>BuildSystemType</key>
+          	<string>Original</string>
+          	<key>PreviewsEnabled</key>
+          	<false/>
+          </dict>
+          </plist>
+          WKST
 
           "$DEVELOPER_DIR/usr/bin/xcodebuild" \
             -workspace ios/TowRides.xcworkspace \
@@ -124,16 +143,18 @@ workflows:
             -derivedDataPath ios/build \
             -destination 'generic/platform=iOS' \
             -xcconfig /tmp/override.xcconfig \
-            -UseModernBuildSystem=YES \
+            -UseNewBuildSystem=NO \
             -skipPackagePluginValidation \
+            -allowProvisioningUpdates \
             clean archive \
             CODE_SIGNING_ALLOWED=YES \
             CODE_SIGNING_REQUIRED=YES \
-            -allowProvisioningUpdates \
             GCC_TREAT_WARNINGS_AS_ERRORS=NO \
             SWIFT_TREAT_WARNINGS_AS_ERRORS=NO \
             EXCLUDED_ARCHS[sdk=iphonesimulator*]="x86_64 arm64" \
             SWIFT_VERSION=5.0 \
+            IPHONEOS_DEPLOYMENT_TARGET=15.1 \
+            ENABLE_BITCODE=NO \
             2>&1 | tee /tmp/xcodebuild_logs/xcodebuild.log
 
           status=$?
