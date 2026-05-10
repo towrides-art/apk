@@ -118,6 +118,8 @@ workflows:
           ENABLE_BITCODE = NO
           SWIFT_VERSION = 5.0
           IPHONEOS_DEPLOYMENT_TARGET = 15.1
+          DEFINES_MODULE = NO
+          CLANG_ENABLE_MODULES = YES
           XCCONFIG
 
           # Create workspace settings to use legacy build system
@@ -146,11 +148,14 @@ workflows:
             -UseNewBuildSystem=NO \
             -skipPackagePluginValidation \
             -allowProvisioningUpdates \
+            -skipUnavailableActions \
             clean archive \
             CODE_SIGNING_ALLOWED=YES \
             CODE_SIGNING_REQUIRED=YES \
             GCC_TREAT_WARNINGS_AS_ERRORS=NO \
             SWIFT_TREAT_WARNINGS_AS_ERRORS=NO \
+            DEFINES_MODULE=NO \
+            CLANG_ENABLE_MODULES=YES \
             EXCLUDED_ARCHS[sdk=iphonesimulator*]="x86_64 arm64" \
             SWIFT_VERSION=5.0 \
             IPHONEOS_DEPLOYMENT_TARGET=15.1 \

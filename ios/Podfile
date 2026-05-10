@@ -9,8 +9,12 @@ ENV['NODE_BINARY'] = node_binary
 # Required for React Native Firebase with use_frameworks!
 $RNFirebaseAsStaticFramework = true
 
-# Mark specific pods as static frameworks
-$static_framework = ['RNFBApp', 'RNFBAuth', 'RNFBMessaging', 'FirebaseAuth', 'FirebaseCore', 'FirebaseCoreInternal', 'FirebaseInstallations', 'FirebaseMessaging', 'GoogleUtilities', 'GTMSessionFetcher', 'PromisesObjC', 'RecaptchaInterop', 'FirebaseAppCheckInterop', 'FirebaseAuthInterop']
+# Mark specific pods as static frameworks - ALL Firebase and RNFB pods
+$static_framework = [
+  'RNFBApp', 'RNFBAuth', 'RNFBMessaging', 'RNFBFirestore', 'RNFBStorage', 'RNFBFunctions', 'RNFBDatabase', 'RNFBAnalytics', 'RNFBRemoteConfig', 'RNFBPerformance', 'RNFBAppCheck', 'RNFBInAppMessaging', 'RNFBInstallations', 'RNFBML', 'RNFBCrashlytics', 'RNFBMessagingInterop',
+  'FirebaseAuth', 'FirebaseCore', 'FirebaseCoreInternal', 'FirebaseCoreExtension', 'FirebaseInstallations', 'FirebaseMessaging', 'FirebaseMessagingInterop', 'FirebaseAnalytics', 'FirebaseFirestore', 'FirebaseStorage', 'FirebaseFunctions', 'FirebaseDatabase', 'FirebaseRemoteConfig', 'FirebasePerformance', 'FirebaseAppCheck', 'FirebaseInAppMessaging', 'FirebaseABTesting', 'FirebaseCrashlytics', 'FirebaseMLModelDownloader',
+  'GoogleUtilities', 'GTMSessionFetcher', 'PromisesObjC', 'PromisesSwift', 'RecaptchaInterop', 'FirebaseAppCheckInterop', 'FirebaseAuthInterop', 'FirebaseSharedSwift', 'FirebaseFirestoreInternal', 'leveldb-library', ' nanopb', 'GoogleDataTransport', 'GoogleAppMeasurement', 'GoogleAppMeasurementIdentitySupport'
+]
 
 require Pod::Executable.execute_command('node', ['-p',
   'require.resolve(
@@ -165,6 +169,49 @@ target 'TowRides' do
           other_cflags << '-fno-exceptions'
           other_cflags << '-fno-rtti'
           config.build_settings['OTHER_CFLAGS'] = other_cflags
+        end
+        
+        # Specific fixes for RNFBMessaging and other RNFB pods
+        if target.name.include?('RNFB')
+          # Ensure proper module map configuration
+          config.build_settings['DEFINES_MODULE'] = 'NO'
+          config.build_settings['MODULEMAP_FILE'] = '$(PODS_ROOT)/Headers/Public/' + target.name + '/' + target.name + '.modulemap'
+          
+          # Add specific header search paths for RNFB pods
+          rnfb_header_paths = [
+            '"${PODS_ROOT}/Headers/Public/RNFBApp"',
+            '"${PODS_ROOT}/Headers/Public/RNFBAuth"',
+            '"${PODS_ROOT}/Headers/Public/RNFBMessaging"',
+            '"${PODS_ROOT}/Headers/Public/Firebase"',
+            '"${PODS_ROOT}/Headers/Public/FirebaseCore"',
+            '"${PODS_ROOT}/Headers/Public/FirebaseMessaging"',
+            '"${PODS_ROOT}/@react-native-firebase/app/ios"',
+            '"${PODS_ROOT}/@react-native-firebase/auth/ios"',
+            '"${PODS_ROOT}/@react-native-firebase/messaging/ios"',
+            '"${PODS_CONFIGURATION_BUILD_DIR}/RNFBApp/RNFBApp.framework/Headers"',
+            '"${PODS_CONFIGURATION_BUILD_DIR}/FirebaseCore/FirebaseCore.framework/Headers"',
+            '"${PODS_CONFIGURATION_BUILD_DIR}/FirebaseMessaging/FirebaseMessaging.framework/Headers"'
+          ]
+          
+          current_headers = Array(config.build_settings['HEADER_SEARCH_PATHS'])
+          rnfb_header_paths.each do |path|
+            current_headers << path unless current_headers.include?(path)
+          end
+          config.build_settings['HEADER_SEARCH_PATHS'] = current_headers
+          
+          # Framework search paths for RNFB pods
+          config.build_settings['FRAMEWORK_SEARCH_PATHS'] = [
+            '$(inherited)',
+            '"${PODS_CONFIGURATION_BUILD_DIR}/RNFBApp"',
+            '"${PODS_CONFIGURATION_BUILD_DIR}/RNFBMessaging"',
+            '"${PODS_CONFIGURATION_BUILD_DIR}/FirebaseCore"',
+            '"${PODS_CONFIGURATION_BUILD_DIR}/FirebaseMessaging"',
+            '"${PODS_CONFIGURATION_BUILD_DIR}/GoogleUtilities"',
+            '"${PODS_CONFIGURATION_BUILD_DIR}/PromisesObjC"'
+          ]
+          
+          # Import frameworks properly
+          config.build_settings['OTHER_LDFLAGS'] = '$(inherited) -ObjC -framework FirebaseCore -framework FirebaseMessaging -framework RNFBApp'
         end
       end
     end
