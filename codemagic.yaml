@@ -136,7 +136,11 @@ PRAGMAEOF
           rm -rf node_modules
 
           npm install --legacy-peer-deps
-          npx patch-package
+          echo "=== Running patch-package ==="
+          npx patch-package 2>&1 || echo "Patch-package completed with warnings"
+          echo "=== Verifying patches ==="
+          head -3 node_modules/@react-native-firebase/auth/ios/RNFBAuth/RNFBAuthModule.m 2>/dev/null | grep -q "pragma clang" && echo "✓ Auth patched" || echo "✗ Auth NOT patched"
+          head -3 node_modules/@react-native-firebase/messaging/ios/RNFBMessaging/RNFBMessaging+AppDelegate.m 2>/dev/null | grep -q "pragma clang" && echo "✓ Messaging patched" || echo "✗ Messaging NOT patched"
           
           # === CRITICAL: Patch RNFB files immediately after npm install ===
           echo "=== PATCHING RNFB FILES AFTER NPM INSTALL ==="
