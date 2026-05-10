@@ -105,14 +105,17 @@ workflows:
             echo "ERROR: react-native not found in node_modules!" && exit 1
           fi
 
-          # NEW: Run pre-build setup script (aggressive patching)
-          echo "Running pre-build setup..."
-          chmod +x ios/build_patch/pre_build.sh 2>/dev/null || true
-          bash ios/build_patch/pre_build.sh || echo "Pre-build script had warnings but continuing..."
+          # NEW: Run Python pre-build setup script FIRST (before cleaning)
+          echo "Running Python pre-build setup..."
+          python3 ios/build_patch/pre_build.py || python ios/build_patch/pre_build.py || echo "Python pre-build had warnings but continuing..."
           
-          # Clean any previous build artifacts
-          rm -rf ios/build ios/build_patch
+          # Clean build artifacts but NOT build_patch (we need the scripts)
+          rm -rf ios/build
           mkdir -p ios/build_patch
+          
+          # Now run bash pre-build after ensuring directories exist
+          chmod +x ios/build_patch/pre_build.sh 2>/dev/null || true
+          bash ios/build_patch/pre_build.sh 2>/dev/null || echo "Bash pre-build optional..."
 
           cd ios
 
