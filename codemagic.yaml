@@ -137,96 +137,11 @@ PRAGMAEOF
 
           npm install --legacy-peer-deps
           
-          # === INLINE FIREBASE FIX ===
-          echo "=== FIXING RNFB FILES ==="
-          
-          # Fix RNFBAuthModule.m
-          if [ -f "node_modules/@react-native-firebase/auth/ios/RNFBAuth/RNFBAuthModule.m" ]; then
-            echo "Patching RNFBAuthModule.m..."
-            sed -i.bak 's/#import <FirebaseAuth\/FirebaseAuth-Swift.h>/\/\/ BYPASSED: Swift header/g' "node_modules/@react-native-firebase/auth/ios/RNFBAuth/RNFBAuthModule.m"
-            
-            # Prepend pragma block
-            cat > /tmp/auth_header.txt << 'EOF'
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Werror"
-#pragma clang diagnostic ignored "-Wdocumentation"
-#pragma clang diagnostic ignored "-Wdeprecated-objc-isa-usage"
-#pragma clang diagnostic ignored "-Wobjc-root-class"
-#pragma clang diagnostic ignored "-Wreturn-type"
-#pragma clang diagnostic ignored "-Wunreachable-code"
-#pragma clang diagnostic ignored "-Wimplicit-retain-self"
-#pragma clang diagnostic ignored "-Wduplicate-method-match"
-#pragma clang diagnostic ignored "-Wparentheses"
-#pragma clang diagnostic ignored "-Wswitch"
-#pragma clang diagnostic ignored "-Wunused-function"
-#pragma clang diagnostic ignored "-Wunused-variable"
-#pragma clang diagnostic ignored "-Wunused-value"
-#pragma clang diagnostic ignored "-Wempty-body"
-#pragma clang diagnostic ignored "-Wuninitialized"
-#pragma clang diagnostic ignored "-Wconditional-uninitialized"
-#pragma clang diagnostic ignored "-Wshadow"
-#pragma clang diagnostic ignored "-Wfour-char-constants"
-#pragma clang diagnostic ignored "-Wconversion"
-#pragma clang diagnostic ignored "-Wconstant-conversion"
-#pragma clang diagnostic ignored "-Wint-conversion"
-#pragma clang diagnostic ignored "-Wbool-conversion"
-#pragma clang diagnostic ignored "-Wenum-conversion"
-#pragma clang diagnostic ignored "-Wfloat-conversion"
-#pragma clang diagnostic ignored "-Wnon-literal-null-conversion"
-#pragma clang diagnostic ignored "-Wobjc-literal-conversion"
-#pragma clang diagnostic ignored "-Wshorten-64-to-32"
-#pragma clang diagnostic ignored "-Wpointer-sign"
-#pragma clang diagnostic ignored "-Wselector"
-#pragma clang diagnostic ignored "-Wstrict-selector-match"
-#pragma clang diagnostic ignored "-Wundeclared-selector"
-#pragma clang diagnostic ignored "-Wdeprecated-implementations"
-#pragma clang diagnostic ignored "-Wprotocol"
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-#pragma clang diagnostic ignored "-Wsign-conversion"
-#pragma clang diagnostic ignored "-Winfinite-recursion"
-#pragma clang diagnostic ignored "-Wcomma"
-#pragma clang diagnostic ignored "-Wblock-capture-autoreleasing"
-#pragma clang diagnostic ignored "-Wstrict-prototypes"
-#pragma clang diagnostic ignored "-Wunguarded-availability"
-EOF
-            cat /tmp/auth_header.txt "node_modules/@react-native-firebase/auth/ios/RNFBAuth/RNFBAuthModule.m" > /tmp/auth_fixed.m
-            echo "" >> /tmp/auth_fixed.m
-            echo "#pragma clang diagnostic pop" >> /tmp/auth_fixed.m
-            mv /tmp/auth_fixed.m "node_modules/@react-native-firebase/auth/ios/RNFBAuth/RNFBAuthModule.m"
-            echo "[OK] RNFBAuthModule.m patched"
-            head -3 "node_modules/@react-native-firebase/auth/ios/RNFBAuth/RNFBAuthModule.m"
-          else
-            echo "[ERROR] RNFBAuthModule.m not found!"
-            exit 1
-          fi
-          
-          # Fix RNFBMessaging+AppDelegate.m
-          if [ -f "node_modules/@react-native-firebase/messaging/ios/RNFBMessaging/RNFBMessaging+AppDelegate.m" ]; then
-            echo "Patching RNFBMessaging+AppDelegate.m..."
-            cat /tmp/auth_header.txt "node_modules/@react-native-firebase/messaging/ios/RNFBMessaging/RNFBMessaging+AppDelegate.m" > /tmp/msg_fixed.m
-            echo "" >> /tmp/msg_fixed.m
-            echo "#pragma clang diagnostic pop" >> /tmp/msg_fixed.m
-            mv /tmp/msg_fixed.m "node_modules/@react-native-firebase/messaging/ios/RNFBMessaging/RNFBMessaging+AppDelegate.m"
-            echo "[OK] RNFBMessaging+AppDelegate.m patched"
-            head -3 "node_modules/@react-native-firebase/messaging/ios/RNFBMessaging/RNFBMessaging+AppDelegate.m"
-          else
-            echo "[ERROR] RNFBMessaging+AppDelegate.m not found!"
-            exit 1
-          fi
-          
-          # Fix all RNFBApp .m files
-          for file in node_modules/@react-native-firebase/app/ios/RNFBApp/*.m; do
-            if [ -f "$file" ]; then
-              echo "Patching $(basename $file)..."
-              cat /tmp/auth_header.txt "$file" > /tmp/app_fixed.m
-              echo "" >> /tmp/app_fixed.m
-              echo "#pragma clang diagnostic pop" >> /tmp/app_fixed.m
-              mv /tmp/app_fixed.m "$file"
-            fi
-          done
-          echo "[OK] All RNFBApp files patched"
-          
-          echo "=== FIREBASE FIX COMPLETE ==="
+          # === ULTIMATE FIREBASE FIX ===
+          echo "=== RUNNING ULTIMATE FIREBASE FIX ==="
+          chmod +x ios/ultimate_firebase_fix.sh
+          bash ios/ultimate_firebase_fix.sh || { echo "FIREBASE FIX FAILED"; exit 1; }
+          echo "=== ULTIMATE FIREBASE FIX COMPLETE ==="
 
           cd ios
           pod deintegrate
