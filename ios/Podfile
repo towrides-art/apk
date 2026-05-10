@@ -6,16 +6,6 @@ if node_binary.nil? || node_binary.empty?
 end
 ENV['NODE_BINARY'] = node_binary
 
-# Required for React Native Firebase with use_frameworks!
-$RNFirebaseAsStaticFramework = true
-
-# Mark specific pods as static frameworks - ALL Firebase and RNFB pods
-$static_framework = [
-  'RNFBApp', 'RNFBAuth', 'RNFBMessaging', 'RNFBFirestore', 'RNFBStorage', 'RNFBFunctions', 'RNFBDatabase', 'RNFBAnalytics', 'RNFBRemoteConfig', 'RNFBPerformance', 'RNFBAppCheck', 'RNFBInAppMessaging', 'RNFBInstallations', 'RNFBML', 'RNFBCrashlytics', 'RNFBMessagingInterop',
-  'FirebaseAuth', 'FirebaseCore', 'FirebaseCoreInternal', 'FirebaseCoreExtension', 'FirebaseInstallations', 'FirebaseMessaging', 'FirebaseMessagingInterop', 'FirebaseAnalytics', 'FirebaseFirestore', 'FirebaseStorage', 'FirebaseFunctions', 'FirebaseDatabase', 'FirebaseRemoteConfig', 'FirebasePerformance', 'FirebaseAppCheck', 'FirebaseInAppMessaging', 'FirebaseABTesting', 'FirebaseCrashlytics', 'FirebaseMLModelDownloader',
-  'GoogleUtilities', 'GTMSessionFetcher', 'PromisesObjC', 'PromisesSwift', 'RecaptchaInterop', 'FirebaseAppCheckInterop', 'FirebaseAuthInterop', 'FirebaseSharedSwift', 'FirebaseFirestoreInternal', 'leveldb-library', ' nanopb', 'GoogleDataTransport', 'GoogleAppMeasurement', 'GoogleAppMeasurementIdentitySupport'
-]
-
 require Pod::Executable.execute_command('node', ['-p',
   'require.resolve(
     "react-native/scripts/react_native_pods.rb",
@@ -25,19 +15,7 @@ require Pod::Executable.execute_command('node', ['-p',
 platform :ios, '15.1'
 prepare_react_native_project!
 
-# Use static frameworks for Firebase Swift support
 use_frameworks! :linkage => :static
-
-# Pre-install hook to mark pods as static frameworks
-pre_install do |installer|
-  installer.pod_targets.each do |pod|
-    if $static_framework.include?(pod.name)
-      def pod.build_type
-        Pod::BuildType.static_library
-      end
-    end
-  end
-end
 
 target 'TowRides' do
   config = use_native_modules!
@@ -70,10 +48,7 @@ target 'TowRides' do
         target.remove_from_project
       end
 
-      # Note: RNPermissions and safe-area-context are needed by the app
-      # Do NOT remove them
-
-      if target.name == 'React-Codegen'
+        if target.name == 'React-Codegen'
         target.build_configurations.each do |config|
           config.build_settings['NODE_BINARY'] = node_binary
         end
@@ -163,113 +138,12 @@ target 'TowRides' do
         other_swift_flags << '-no-warnings-as-errors'
         config.build_settings['OTHER_SWIFT_FLAGS'] = other_swift_flags
         
-        # Framework search paths for all targets
-        config.build_settings['FRAMEWORK_SEARCH_PATHS'] = '$(inherited) "${PODS_CONFIGURATION_BUILD_DIR}" "${PODS_ROOT}/FirebaseAuth/Frameworks" "${PODS_ROOT}/FirebaseCore/Frameworks"'
-        
-        # Header search paths for all targets
-        header_search_paths = Array(config.build_settings['HEADER_SEARCH_PATHS'])
-        header_search_paths << '$(inherited)' if header_search_paths.empty?
-        header_search_paths << '"${PODS_ROOT}/Headers/Public"'
-        header_search_paths << '"${PODS_ROOT}/Headers/Public/Firebase"'
-        header_search_paths << '"${PODS_ROOT}/Firebase/CoreOnly/Sources"'
-        header_search_paths << '"${PODS_ROOT}/FirebaseAuth/FirebaseAuth/Sources"'
-        header_search_paths << '"${PODS_ROOT}/FirebaseMessaging/FirebaseMessaging/Sources"'
-        # CRITICAL: Add Swift generated headers path for Firebase
-        header_search_paths << '"${PODS_CONFIGURATION_BUILD_DIR}/FirebaseAuth/FirebaseAuth.framework/Headers"'
-        header_search_paths << '"${PODS_CONFIGURATION_BUILD_DIR}/FirebaseCore/FirebaseCore.framework/Headers"'
-        header_search_paths << '"${PODS_CONFIGURATION_BUILD_DIR}/FirebaseCoreInternal/FirebaseCoreInternal.framework/Headers"'
-        header_search_paths << '"${PODS_CONFIGURATION_BUILD_DIR}/FirebaseInstallations/FirebaseInstallations.framework/Headers"'
-        header_search_paths << '"${PODS_CONFIGURATION_BUILD_DIR}/FirebaseMessaging/FirebaseMessaging.framework/Headers"'
-        header_search_paths << '"${PODS_CONFIGURATION_BUILD_DIR}/GTMSessionFetcher/GTMSessionFetcher.framework/Headers"'
-        header_search_paths << '"${PODS_CONFIGURATION_BUILD_DIR}/GoogleUtilities/GoogleUtilities.framework/Headers"'
-        config.build_settings['HEADER_SEARCH_PATHS'] = header_search_paths
-        
         # Linker flags
         other_ldflags = Array(config.build_settings['OTHER_LDFLAGS'])
         other_ldflags << '$(inherited)' if other_ldflags.empty?
         other_ldflags << '-ObjC'
         other_ldflags << '-all_load'
         config.build_settings['OTHER_LDFLAGS'] = other_ldflags
-        
-        # C++ flags for all targets
-        if target.name.include?('React') || target.name.include?('react-native')
-          other_cflags = Array(config.build_settings['OTHER_CFLAGS'])
-          other_cflags << '$(inherited)' if other_cflags.empty?
-          other_cflags << '-fno-exceptions'
-          other_cflags << '-fno-rtti'
-          config.build_settings['OTHER_CFLAGS'] = other_cflags
-        end
-        
-        # Specific fixes for RNFBMessaging and other RNFB pods
-        if target.name.include?('RNFB')
-          # Enable modules for Swift header compatibility
-          config.build_settings['DEFINES_MODULE'] = 'YES'
-          config.build_settings['CLANG_ENABLE_MODULES'] = 'YES'
-          config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
-          
-          # Strip ALL -Werror for RNFB pods - COMPLETELY REPLACE flags
-          rnfb_cflags = ['-w', '-Wno-error', '-Wno-everything']
-          config.build_settings['OTHER_CFLAGS'] = rnfb_cflags
-          
-          # Add specific header search paths for RNFB pods
-          rnfb_header_paths = [
-            '"${PODS_ROOT}/Headers/Public/RNFBApp"',
-            '"${PODS_ROOT}/Headers/Public/RNFBAuth"',
-            '"${PODS_ROOT}/Headers/Public/RNFBMessaging"',
-            '"${PODS_ROOT}/Headers/Public/Firebase"',
-            '"${PODS_ROOT}/Headers/Public/FirebaseCore"',
-            '"${PODS_ROOT}/Headers/Public/FirebaseMessaging"',
-            '"${PODS_ROOT}/Headers/Public/FirebaseAuth"',
-            '"${PODS_ROOT}/@react-native-firebase/app/ios"',
-            '"${PODS_ROOT}/@react-native-firebase/auth/ios"',
-            '"${PODS_ROOT}/@react-native-firebase/messaging/ios"',
-            '"${PODS_CONFIGURATION_BUILD_DIR}/RNFBApp/RNFBApp.framework/Headers"',
-            '"${PODS_CONFIGURATION_BUILD_DIR}/RNFBAuth/RNFBAuth.framework/Headers"',
-            '"${PODS_CONFIGURATION_BUILD_DIR}/RNFBMessaging/RNFBMessaging.framework/Headers"',
-            '"${PODS_CONFIGURATION_BUILD_DIR}/FirebaseCore/FirebaseCore.framework/Headers"',
-            '"${PODS_CONFIGURATION_BUILD_DIR}/FirebaseMessaging/FirebaseMessaging.framework/Headers"',
-            '"${PODS_CONFIGURATION_BUILD_DIR}/FirebaseAuth/FirebaseAuth.framework/Headers"',
-            '"${PODS_ROOT}/FirebaseAuth/FirebaseAuth/Sources"',
-            '"${PODS_ROOT}/Headers/Public/FirebaseAuth"'
-          ]
-          
-          current_headers = Array(config.build_settings['HEADER_SEARCH_PATHS'])
-          rnfb_header_paths.each do |path|
-            current_headers << path unless current_headers.include?(path)
-          end
-          config.build_settings['HEADER_SEARCH_PATHS'] = current_headers
-          
-          # EXTRA: RNFBAuth specific Swift header paths
-          if target.name == 'RNFBAuth'
-            config.build_settings['LIBRARY_SEARCH_PATHS'] = [
-              '$(inherited)',
-              '"${PODS_CONFIGURATION_BUILD_DIR}/FirebaseAuth"',
-              '"${PODS_CONFIGURATION_BUILD_DIR}/FirebaseCore"'
-            ]
-          end
-          
-          # Framework search paths for RNFB pods
-          config.build_settings['FRAMEWORK_SEARCH_PATHS'] = [
-            '$(inherited)',
-            '"${PODS_CONFIGURATION_BUILD_DIR}/RNFBApp"',
-            '"${PODS_CONFIGURATION_BUILD_DIR}/RNFBAuth"',
-            '"${PODS_CONFIGURATION_BUILD_DIR}/RNFBMessaging"',
-            '"${PODS_CONFIGURATION_BUILD_DIR}/FirebaseCore"',
-            '"${PODS_CONFIGURATION_BUILD_DIR}/FirebaseCoreInternal"',
-            '"${PODS_CONFIGURATION_BUILD_DIR}/FirebaseMessaging"',
-            '"${PODS_CONFIGURATION_BUILD_DIR}/FirebaseAuth"',
-            '"${PODS_CONFIGURATION_BUILD_DIR}/FirebaseInstallations"',
-            '"${PODS_CONFIGURATION_BUILD_DIR}/GoogleUtilities"',
-            '"${PODS_CONFIGURATION_BUILD_DIR}/PromisesObjC"',
-            '"${PODS_CONFIGURATION_BUILD_DIR}/GTMSessionFetcher"',
-            '"${PODS_CONFIGURATION_BUILD_DIR}/GoogleDataTransport"',
-            '"${PODS_CONFIGURATION_BUILD_DIR}/nanopb"'
-          ]
-          
-          # Import frameworks properly
-          config.build_settings['OTHER_LDFLAGS'] = '$(inherited) -ObjC -framework FirebaseCore -framework FirebaseMessaging -framework FirebaseAuth -framework RNFBApp -framework RNFBAuth'
-        end
-        
         # Fix for react-native-permissions to avoid build issues
         if target.name.include?('RNPermissions')
           config.build_settings['OTHER_CFLAGS'] = ['-w', '-Wno-error']
@@ -282,87 +156,9 @@ target 'TowRides' do
           config.build_settings['GCC_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
         end
         
-        # Fix for GoogleUtilities (often has -Werror issues)
-        if target.name.include?('GoogleUtilities')
-          config.build_settings['OTHER_CFLAGS'] = ['-w', '-Wno-error', '-Wno-everything']
-          config.build_settings['GCC_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
-        end
         
-        # Fix for GoogleDataTransport
-        if target.name.include?('GoogleDataTransport')
-          config.build_settings['OTHER_CFLAGS'] = ['-w', '-Wno-error', '-Wno-everything']
-          config.build_settings['GCC_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
-        end
-        
-        # Fix for PromisesObjC (FBLPromises - has -Werror issues)
-        if target.name.include?('PromisesObjC')
-          config.build_settings['OTHER_CFLAGS'] = ['-w', '-Wno-error', '-Wno-everything']
-          config.build_settings['GCC_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
-          config.build_settings['WARNING_CFLAGS'] = '-w'
-        end
-        
-        # COMPREHENSIVE FIX: All Firebase and Google pods
-        if target.name.include?('Firebase') || target.name.include?('Google') || target.name.include?('GTMSessionFetcher') || target.name.include?('nanopb')
-          config.build_settings['OTHER_CFLAGS'] = ['-w', '-Wno-error', '-Wno-everything']
-          config.build_settings['GCC_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
-          config.build_settings['WARNING_CFLAGS'] = '-w'
-          config.build_settings['GCC_WARN_INHIBIT_ALL_WARNINGS'] = 'YES'
-        end
-        
-        # COMPREHENSIVE FIX: All React Native Firebase pods
-        if target.name.include?('RNFB')
-          config.build_settings['OTHER_CFLAGS'] = ['-w', '-Wno-error', '-Wno-everything']
-          config.build_settings['GCC_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
-          config.build_settings['WARNING_CFLAGS'] = '-w'
-          config.build_settings['GCC_WARN_INHIBIT_ALL_WARNINGS'] = 'YES'
-          config.build_settings['CLANG_WARN_DOCUMENTATION_COMMENTS'] = 'NO'
-          config.build_settings['CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF'] = 'NO'
-          config.build_settings['CLANG_WARN_OBJC_LITERAL_CONVERSION'] = 'NO'
-          config.build_settings['CLANG_WARN_SUSPICIOUS_MOVE'] = 'NO'
-          config.build_settings['CLANG_WARN_UNREACHABLE_CODE'] = 'NO'
-          config.build_settings['CLANG_WARN__DUPLICATE_METHOD_MATCH'] = 'NO'
-          config.build_settings['CLANG_WARN_BOOL_CONVERSION'] = 'NO'
-          config.build_settings['CLANG_WARN_CONSTANT_CONVERSION'] = 'NO'
-          config.build_settings['CLANG_WARN_DIRECT_OBJC_ISA_USAGE'] = 'NO'
-          config.build_settings['CLANG_WARN_EMPTY_BODY'] = 'NO'
-          config.build_settings['CLANG_WARN_ENUM_CONVERSION'] = 'NO'
-          config.build_settings['CLANG_WARN_INFINITE_RECURSION'] = 'NO'
-          config.build_settings['CLANG_WARN_INT_CONVERSION'] = 'NO'
-          config.build_settings['CLANG_WARN_NON_LITERAL_NULL_CONVERSION'] = 'NO'
-          config.build_settings['CLANG_WARN_OBJC_ROOT_CLASS'] = 'NO'
-          config.build_settings['CLANG_WARN_RANGE_LOOP_ANALYSIS'] = 'NO'
-          config.build_settings['CLANG_WARN_STRICT_PROTOTYPES'] = 'NO'
-          config.build_settings['CLANG_WARN_UNGUARDED_AVAILABILITY'] = 'NO'
-        end
-        
-        # ULTRA FIX: Disable ALL warnings for ALL pods
-        config.build_settings['GCC_WARN_64_TO_32_BIT_CONVERSION'] = 'NO'
-        config.build_settings['GCC_WARN_ABOUT_DEPRECATED_FUNCTIONS'] = 'NO'
-        config.build_settings['GCC_WARN_ABOUT_INVALID_OFFSETOF_MACRO'] = 'NO'
-        config.build_settings['GCC_WARN_ABOUT_MISSING_FIELD_INITIALIZERS'] = 'NO'
-        config.build_settings['GCC_WARN_ABOUT_MISSING_NEWLINE'] = 'NO'
-        config.build_settings['GCC_WARN_ABOUT_MISSING_PROTOTYPES'] = 'NO'
-        config.build_settings['GCC_WARN_ABOUT_POINTER_SIGNEDNESS'] = 'NO'
-        config.build_settings['GCC_WARN_ABOUT_RETURN_TYPE'] = 'NO'
-        config.build_settings['GCC_WARN_ALLOW_INCOMPLETE_PROTOCOL'] = 'NO'
-        config.build_settings['GCC_WARN_CHECK_SWITCH_STATEMENTS'] = 'NO'
-        config.build_settings['GCC_WARN_FOUR_CHARACTER_CONSTANTS'] = 'NO'
-        config.build_settings['GCC_WARN_HIDDEN_VIRTUAL_FUNCTIONS'] = 'NO'
-        config.build_settings['GCC_WARN_INITIALIZER_NOT_FULLY_BRACKETED'] = 'NO'
-        config.build_settings['GCC_WARN_MISSING_PARENTHESES'] = 'NO'
-        config.build_settings['GCC_WARN_NON_VIRTUAL_DESTRUCTOR'] = 'NO'
-        config.build_settings['GCC_WARN_SHADOW'] = 'NO'
-        config.build_settings['GCC_WARN_SIGN_COMPARE'] = 'NO'
-        config.build_settings['GCC_WARN_TYPECHECK_CALLS_TO_PRINTF'] = 'NO'
-        config.build_settings['GCC_WARN_UNDECLARED_SELECTOR'] = 'NO'
-        config.build_settings['GCC_WARN_UNINITIALIZED_AUTOS'] = 'NO'
-        config.build_settings['GCC_WARN_UNKNOWN_PRAGMAS'] = 'NO'
-        config.build_settings['GCC_WARN_UNUSED_FUNCTION'] = 'NO'
-        config.build_settings['GCC_WARN_UNUSED_LABEL'] = 'NO'
-        config.build_settings['GCC_WARN_UNUSED_PARAMETER'] = 'NO'
-        config.build_settings['GCC_WARN_UNUSED_VALUE'] = 'NO'
-        config.build_settings['GCC_WARN_UNUSED_VARIABLE'] = 'NO'
       end
     end
+    
   end
 end

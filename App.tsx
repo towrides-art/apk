@@ -29,7 +29,6 @@ import TrackingScreen from './Screens/Tracking/TrackingScreen';
 import PaymentScreen from './Screens/PaymentPage'
 import SplashVideo from './Screens/VideoSplash';
 import DriverSupport from './Screens/Support';
-import messaging from '@react-native-firebase/messaging';
 import notifee, { AndroidImportance } from '@notifee/react-native';
 
 const Stack = createNativeStackNavigator();
@@ -83,34 +82,8 @@ const AppContent: React.FC = () => {
     });
   };
 
-  // 3️⃣ Get FCM token
-  const getFcmToken = async () => {
-    const token = await messaging().getToken();
-    // localStorage.setItem('fcm_token',token)
-    await AsyncStorage.setItem('fcm_token',token)
-    console.log("FCM TOKEN:", token);
-  };
-
-  // 4️⃣ Show notification in foreground
-  const foregroundListener = () => {
-    messaging().onMessage(async (remoteMessage) => {
-      console.log("FOREGROUND MESSAGE:", remoteMessage);
-
-      // Show notification manually
-      await notifee.displayNotification({
-        title: remoteMessage.notification?.title ?? "New Message",
-        body: remoteMessage.notification?.body ?? "You have a notification",
-        android: {
-          channelId: 'default',
-          smallIcon: 'ic_launcher', // name of mipmap icon
-        },
-      });
-    });
-  };
   requestAndroidPermission();
     createChannel();
-    getFcmToken();
-    foregroundListener();
     initializeApp();
      
     
@@ -120,23 +93,6 @@ const AppContent: React.FC = () => {
     return <SplashVideo />;
   }
 
-  // 1. Get FCM Token
-  const fetchFcmToken = async () => {
-    try {
-      const token = await messaging().getToken();
-      console.log("FCM Token:", token);
-    } catch (e) {
-      console.log("FCM token error:", e);
-    }
-  };
-
-  // 2. Listen for foreground messages
-  const listenForegroundMessages = () => {
-    messaging().onMessage(async remoteMessage => {
-      console.log("Foreground:", remoteMessage);
-    });
-  };
- 
 // React.useEffect(()=>{
   
 //    // requestPermission();

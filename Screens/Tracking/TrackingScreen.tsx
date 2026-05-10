@@ -5,26 +5,9 @@ import MapView, { Marker } from 'react-native-maps';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import api from '../axiosInstance';
 import MapViewDirections from 'react-native-maps-directions';
-import { initializeApp } from 'firebase/app';
-import { getDatabase, onValue, ref } from 'firebase/database';
 import { Linking } from 'react-native';
 
-// Firebase Configuration - Replace with your actual config
-const firebaseConfig = {
-  apiKey: "AIzaSyDk1SkSAeeuLk8X1wKkqfrwmYio0tJ1YwU",
-  authDomain: "snoutiq-web.firebaseapp.com",
-  databaseURL: "https://snoutiq-web-default-rtdb.firebaseio.com/",
-  projectId: "snoutiq-web",
-  storageBucket: "snoutiq-web.appspot.com",
-  messagingSenderId: "842517331722",
-  appId: "1:842517331722:web:9c3b844d61b3a79d6784f3",
-  measurementId: "G-L7FZJP94WE"
-};
-const GOOGLE_MAPS_API_KEY = 'AIzaSyCr6FbhZa_qV3jn7bz6lr7OZYfTz5Xrpzo';   // ← replace
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const database = getDatabase(app); 
+const GOOGLE_MAPS_API_KEY = 'AIzaSyCr6FbhZa_qV3jn7bz6lr7OZYfTz5Xrpzo';   // ← replace 
 
 const { width, height } = Dimensions.get('window');
 
@@ -104,7 +87,7 @@ export default function TrackingScreen({ navigation, route }: any) {
 
   const mapRef = useRef<MapView>(null);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const firebaseListenerRef = useRef<any>(null);
+  const locationPollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Initialize locations and start tracking
   useEffect(() => {
@@ -127,12 +110,12 @@ export default function TrackingScreen({ navigation, route }: any) {
     // Start polling ride status
     startStatusPolling();
     
-    // Start Firebase location listening
-    startLocationTracking();
+    // Start location polling
+    startLocationPolling();
 
     return () => {
       stopStatusPolling();
-      stopLocationTracking();
+      stopLocationPolling();
     };
   }, [bookingId]);
   
@@ -230,51 +213,48 @@ export default function TrackingScreen({ navigation, route }: any) {
     }
   };
 
-  // Start Firebase real-time location tracking
-  const startLocationTracking = () => {
+  // Start location polling (replaces Firebase Realtime DB)
+  const startLocationPolling = () => {
     if (!bookingId) return;
 
-    const locationRef = ref(database, `driverLocations/${bookingId}`);
-    
-    const listener = onValue(locationRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        console.log('Driver location update:', data);
-        setDriverLocation({
-          latitude: data.latitude,
-          longitude: data.longitude,
-          timestamp: data.timestamp,
-          status: data.status
-        });
-        
-        // Animate map to show driver location
-        if (mapRef.current && data.latitude && data.longitude) {
-          mapRef.current.animateToRegion({
+    const pollLocation = async () => {
+      try {
+        const response = await api.get(`/user/driver-location/${bookingId}`);
+        const data = response.data;
+        if (data && data.latitude && data.longitude) {
+          console.log('Driver location update:', data);
+          setDriverLocation({
             latitude: data.latitude,
             longitude: data.longitude,
-            latitudeDelta: 0.01,
-            longitudeDelta: 0.01,
-          }, 1000);
+            timestamp: data.timestamp,
+            status: data.status
+          });
+
+          // Animate map to show driver location
+          if (mapRef.current) {
+            mapRef.current.animateToRegion({
+              latitude: data.latitude,
+              longitude: data.longitude,
+              latitudeDelta: 0.01,
+              longitudeDelta: 0.01,
+            }, 1000);
+          }
         }
+      } catch (e) {
+        console.warn('Location poll error:', e);
       }
-    });
-    
-    firebaseListenerRef.current = { ref: locationRef, listener };
+    };
+
+    // Poll every 3 seconds
+    pollLocation();
+    locationPollIntervalRef.current = setInterval(pollLocation, 3000);
   };
 
-  // Stop Firebase location tracking
-  const stopLocationTracking = () => {
-    if (firebaseListenerRef.current) {
-      // onValue returns an unsubscribe function; call it if present.
-      const unsubscribe = firebaseListenerRef.current.listener;
-      if (typeof unsubscribe === 'function') {
-        try {
-          unsubscribe();
-        } catch (e) {
-          console.warn('Error while unsubscribing from Firebase listener:', e);
-        }
-      }
-      firebaseListenerRef.current = null;
+  // Stop location polling
+  const stopLocationPolling = () => {
+    if (locationPollIntervalRef.current) {
+      clearInterval(locationPollIntervalRef.current);
+      locationPollIntervalRef.current = null;
     }
   };
 
