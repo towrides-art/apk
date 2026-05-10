@@ -77,13 +77,17 @@ workflows:
           echo "=== Re-patching source files after pod install ==="
           cd ..
           
-          # Debug: Check if pre_build.py exists
-          echo "Checking pre_build.py existence..."
-          ls -la ios/build_patch/pre_build.py || echo "pre_build.py NOT FOUND!"
+          # Debug: Check if pre_build_new.py exists
+          echo "Checking pre_build_new.py existence..."
+          ls -la ios/build_patch/pre_build_new.py || echo "pre_build_new.py NOT FOUND!"
           
-          # Run Python script with verbose output
-          echo "Running pre_build.py..."
-          python3 ios/build_patch/pre_build.py 2>&1 || python ios/build_patch/pre_build.py 2>&1 || echo "Python re-patch had warnings but continuing..."
+          # Run the NEW Python script with verbose output
+          echo "Running pre_build_new.py..."
+          python3 ios/build_patch/pre_build_new.py 2>&1 || python ios/build_patch/pre_build_new.py 2>&1 || echo "Python re-patch had warnings but continuing..."
+          
+          # Also run old script as backup
+          echo "Running legacy pre_build.py as backup..."
+          python3 ios/build_patch/pre_build.py 2>&1 || true
           
           # Verify the patched file
           echo "=== Verifying RNFBMessaging+AppDelegate.m is patched ==="
@@ -130,7 +134,11 @@ workflows:
 
           # NEW: Run Python pre-build setup script FIRST (before cleaning)
           echo "Running Python pre-build setup..."
-          python3 ios/build_patch/pre_build.py || python ios/build_patch/pre_build.py || echo "Python pre-build had warnings but continuing..."
+          python3 ios/build_patch/pre_build_new.py 2>&1 || python ios/build_patch/pre_build_new.py 2>&1 || echo "Python pre-build had warnings but continuing..."
+          
+          # Also run old script as backup
+          echo "Running legacy pre_build.py as backup..."
+          python3 ios/build_patch/pre_build.py 2>&1 || true
           
           # Clean build artifacts but NOT build_patch (we need the scripts)
           rm -rf ios/build
