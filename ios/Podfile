@@ -66,15 +66,12 @@ target 'TowRides' do
          target.name.include?('React-renderer') ||
          target.name.include?('React-ImageManager') ||
          target.name.include?('React-FabricImage') ||
-         target.name.include?('React-RCTFabric') ||
-         target.name.include?('RNPermissions')
+         target.name.include?('React-RCTFabric')
         target.remove_from_project
       end
 
-      # Remove react-native-safe-area-context due to Xcode 16 incompatibility
-      if target.name.include?('react-native-safe-area-context')
-        target.remove_from_project
-      end
+      # Note: RNPermissions and safe-area-context are needed by the app
+      # Do NOT remove them
 
       if target.name == 'React-Codegen'
         target.build_configurations.each do |config|
@@ -249,6 +246,30 @@ target 'TowRides' do
           
           # Import frameworks properly
           config.build_settings['OTHER_LDFLAGS'] = '$(inherited) -ObjC -framework FirebaseCore -framework FirebaseMessaging -framework FirebaseAuth -framework RNFBApp -framework RNFBAuth'
+        end
+        
+        # Fix for react-native-permissions to avoid build issues
+        if target.name.include?('RNPermissions')
+          config.build_settings['OTHER_CFLAGS'] = ['-w', '-Wno-error']
+          config.build_settings['GCC_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
+        end
+        
+        # Fix for react-native-safe-area-context
+        if target.name.include?('safe-area-context')
+          config.build_settings['OTHER_CFLAGS'] = ['-w', '-Wno-error']
+          config.build_settings['GCC_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
+        end
+        
+        # Fix for GoogleUtilities (often has -Werror issues)
+        if target.name.include?('GoogleUtilities')
+          config.build_settings['OTHER_CFLAGS'] = ['-w', '-Wno-error', '-Wno-everything']
+          config.build_settings['GCC_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
+        end
+        
+        # Fix for GoogleDataTransport
+        if target.name.include?('GoogleDataTransport')
+          config.build_settings['OTHER_CFLAGS'] = ['-w', '-Wno-error', '-Wno-everything']
+          config.build_settings['GCC_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
         end
       end
     end

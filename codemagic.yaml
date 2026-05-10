@@ -95,6 +95,20 @@ workflows:
           export NODE_BINARY
           export PATH="$(dirname "$NODE_BINARY"):$PATH"
 
+          # Verify node_modules exists
+          if [ ! -d "node_modules" ]; then
+            echo "ERROR: node_modules not found!" && exit 1
+          fi
+
+          # Verify React Native is installed
+          if [ ! -d "node_modules/react-native" ]; then
+            echo "ERROR: react-native not found in node_modules!" && exit 1
+          fi
+
+          # Clean any previous build artifacts
+          rm -rf ios/build ios/build_patch
+          mkdir -p ios/build_patch
+
           cd ios
 
           cat <<EOF > .xcode.env
@@ -113,6 +127,12 @@ workflows:
           PATH=$PATH
           EOF
 
+          # Verify Pods are installed
+          if [ ! -d "Pods" ]; then
+            echo "ERROR: Pods directory not found! Running pod install..."
+            pod install --repo-update
+          fi
+
           # Re-patch xcconfig files (in case anything changed)
           echo "=== Re-patching xcconfig files ==="
           find Pods/Target\ Support\ Files -name "*.xcconfig" -type f -exec sed -i '' 's/-Werror[^[:space:]]*//g' {} \; 2>/dev/null || true
@@ -123,6 +143,11 @@ workflows:
             sed -i '' 's/-Werror[^[:space:]]*//g' Pods/Pods.xcodeproj/project.pbxproj 2>/dev/null || true
             sed -i '' 's/GCC_WARN_INHIBIT_ALL_WARNINGS = NO/GCC_WARN_INHIBIT_ALL_WARNINGS = YES/g' Pods/Pods.xcodeproj/project.pbxproj 2>/dev/null || true
           fi
+
+          # List key patched files for debugging
+          echo "=== Verifying patched files ==="
+          cat Pods/Target\ Support\ Files/RNFBMessaging/RNFBMessaging.release.xcconfig 2>/dev/null || echo "RNFBMessaging config not found"
+          cat Pods/Target\ Support\ Files/GoogleUtilities/GoogleUtilities.release.xcconfig 2>/dev/null || echo "GoogleUtilities config not found"
 
           cd ..
 
