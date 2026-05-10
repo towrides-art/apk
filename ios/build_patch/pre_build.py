@@ -135,7 +135,64 @@ for msg_file in messaging_files:
     else:
         print(f"  File not found: {msg_file}")
 
-# 4. Patch xcconfig files
+# 4. Patch ALL other Firebase modules for safety
+print("\nPatching all other Firebase modules...")
+firebase_modules = ['app', 'analytics', 'crashlytics', 'performance', 'dynamicLinks', 
+                    'inAppMessaging', 'remoteConfig', 'storage', 'firestore', 
+                    'functions', 'installalls']
+
+for module in firebase_modules:
+    module_path = f"node_modules/@react-native-firebase/{module}/ios"
+    if os.path.exists(module_path):
+        for root, dirs, files in os.walk(module_path):
+            for file in files:
+                if file.endswith('.m'):
+                    mod_file = os.path.join(root, file)
+                    try:
+                        with open(mod_file, 'r') as f:
+                            content = f.read()
+                        
+                        # Add pragmas if not present
+                        if '#pragma clang diagnostic' not in content[:100]:
+                            content = messaging_pragma + content
+                        
+                        if '#pragma clang diagnostic pop' not in content[-100:]:
+                            content = content + '\n#pragma clang diagnostic pop\n'
+                        
+                        with open(mod_file, 'w') as f:
+                            f.write(content)
+                        
+                        print(f"  Patched: {mod_file}")
+                    except Exception as e:
+                        pass  # Silent fail
+
+# 5. Patch Firebase.h to comment out Swift header import
+print("\nPatching Firebase.h...")
+firebase_h_paths = [
+    "ios/Pods/Headers/Private/Firebase/Firebase.h",
+    "ios/Pods/Headers/Public/Firebase/Firebase.h",
+]
+
+for firebase_h in firebase_h_paths:
+    if os.path.exists(firebase_h):
+        try:
+            with open(firebase_h, 'r') as f:
+                content = f.read()
+            
+            # Comment out Swift header import
+            content = content.replace(
+                '#import <FirebaseAuth/FirebaseAuth-Swift.h>',
+                '// BYPASSED: #import <FirebaseAuth/FirebaseAuth-Swift.h>'
+            )
+            
+            with open(firebase_h, 'w') as f:
+                f.write(content)
+            
+            print(f"  Patched: {firebase_h}")
+        except Exception as e:
+            print(f"  Error patching {firebase_h}: {e}")
+
+# 6. Patch xcconfig files
 print("\nPatching xcconfig files...")
 if os.path.exists("ios/Pods"):
     for root, dirs, files in os.walk("ios/Pods"):
