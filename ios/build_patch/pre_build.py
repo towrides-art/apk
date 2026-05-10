@@ -82,14 +82,15 @@ if os.path.exists(auth_module):
 else:
     print(f"  File not found: {auth_module}")
 
-# 3. Patch RNFBMessaging+AppDelegate.m - ULTRA AGGRESSIVE
-print("\nPatching RNFBMessaging+AppDelegate.m - ULTRA MODE...")
+# 3. Patch RNFBMessaging+AppDelegate.m - ULTRA AGGRESSIVE FORCE PATCH
+print("\nPatching RNFBMessaging+AppDelegate.m - FORCE MODE...")
 
 messaging_app_delegate = "node_modules/@react-native-firebase/messaging/ios/RNFBMessaging/RNFBMessaging+AppDelegate.m"
 messaging_un_center = "node_modules/@react-native-firebase/messaging/ios/RNFBMessaging/RNFBMessaging+UNUserNotificationCenter.m"
+auth_module = "node_modules/@react-native-firebase/auth/ios/RNFBAuth/RNFBAuthModule.m"
 
 # ULTRA pragma block with EVERY warning disabled
-ultra_pragma = """#pragma clang diagnostic push
+ultra_pragma = '''#pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Werror"
 #pragma clang diagnostic ignored "-Wdocumentation"
 #pragma clang diagnostic ignored "-Wdeprecated-objc-isa-usage"
@@ -135,67 +136,98 @@ ultra_pragma = """#pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wmissing-prototypes"
 #pragma clang diagnostic ignored "-Wtrigraphs"
 #pragma clang diagnostic ignored "-Wunknown-pragmas"
+#pragma clang diagnostic ignored "-Wnon-modular-include-in-framework-module"
 
-"""
+'''
 
-def ultra_patch_file(filepath):
-    """Ultra aggressive patching of a single file"""
+def force_patch_file(filepath, is_auth=False):
+    """Force patch a file by prepending pragmas"""
     if not os.path.exists(filepath):
         print(f"  File not found: {filepath}")
-        return
+        return False
     
     try:
         # Read original
         with open(filepath, 'r') as f:
-            content = f.read()
+            original_content = f.read()
         
-        # Create backup
-        backup_path = filepath + ".original"
-        if not os.path.exists(backup_path):
-            with open(backup_path, 'w') as f:
-                f.write(content)
+        print(f"  Original size: {len(original_content)} bytes")
         
-        # Check if already patched
-        if '#pragma clang diagnostic' in content[:200]:
-            print(f"  Already patched: {filepath}")
-            return
+        # Remove any existing pragma push at top
+        lines = original_content.split('\n')
+        while lines and '#pragma clang diagnostic' in lines[0]:
+            lines.pop(0)
         
-        # Apply ultra pragma at the VERY beginning
+        # Also remove pragma pop at bottom
+        while lines and ('#pragma clang diagnostic pop' in lines[-1] or lines[-1].strip() == ''):
+            if '#pragma clang diagnostic pop' in lines[-1]:
+                lines.pop()
+            elif lines[-1].strip() == '':
+                lines.pop()
+            else:
+                break
+        
+        # Reconstruct content
+        content = '\n'.join(lines)
+        
+        # Add auth-specific comment for FirebaseAuth-Swift.h
+        if is_auth:
+            # Comment out the problematic import
+            content = content.replace(
+                '#import <FirebaseAuth/FirebaseAuth-Swift.h>',
+                '// BYPASSED: #import <FirebaseAuth/FirebaseAuth-Swift.h>'
+            )
+            content = content.replace(
+                '#import "FirebaseAuth-Swift.h"',
+                '// BYPASSED: #import "FirebaseAuth-Swift.h"'
+            )
+        
+        # Prepend pragma
         new_content = ultra_pragma + content
         
-        # Add pragma pop at the VERY end
-        if '#pragma clang diagnostic pop' not in content[-200:]:
-            new_content = new_content + '\n\n#pragma clang diagnostic pop\n'
+        # Append pragma pop
+        new_content = new_content + '\n\n#pragma clang diagnostic pop\n'
         
         # Write back
         with open(filepath, 'w') as f:
             f.write(new_content)
         
-        print(f"  ULTRA Patched: {filepath}")
+        # Force sync to disk
+        os.sync()
         
         # Verify
         with open(filepath, 'r') as f:
             verify = f.read()
-        if '#pragma clang diagnostic' in verify[:200]:
-            print(f"  ✓ Verified: {filepath}")
+        
+        if verify.startswith('#pragma clang diagnostic push'):
+            print(f"  ✓✓✓ FORCE PATCHED: {filepath}")
+            print(f"  New size: {len(verify)} bytes")
+            return True
         else:
-            print(f"  ✗ Verification failed: {filepath}")
+            print(f"  ✗✗✗ FAILED: {filepath}")
+            print(f"  First 100 chars: {verify[:100]}")
+            return False
             
     except Exception as e:
-        print(f"  Error patching {filepath}: {e}")
+        print(f"  ✗✗✗ ERROR: {filepath} - {e}")
+        import traceback
+        traceback.print_exc()
+        return False
 
-# Patch the problematic files
-ultra_patch_file(messaging_app_delegate)
-ultra_patch_file(messaging_un_center)
+# FORCE patch the critical files
+print("\n=== FORCE PATCHING CRITICAL FILES ===")
+force_patch_file(messaging_app_delegate)
+force_patch_file(messaging_un_center)
+force_patch_file(auth_module, is_auth=True)
 
-# Also patch ALL files in the messaging directory for safety
-print("\n  Patching ALL files in RNFBMessaging directory...")
+# Also patch ALL files in messaging directory
+print("\n=== PATCHING ALL MESSAGING FILES ===")
 messaging_dir = "node_modules/@react-native-firebase/messaging/ios/RNFBMessaging"
 if os.path.exists(messaging_dir):
     for filename in os.listdir(messaging_dir):
         if filename.endswith('.m'):
             filepath = os.path.join(messaging_dir, filename)
-            ultra_patch_file(filepath)
+            force_patch_file(filepath)
 
 # 4. Patch ALL other Firebase modules for safety
 print("\nPatching all other Firebase modules...")
