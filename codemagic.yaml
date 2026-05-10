@@ -59,6 +59,23 @@ workflows:
           pod cache clean --all
           pod repo update
           pod install --repo-update
+          
+          # Patch generated xcconfig files to remove ALL -Werror flags
+          echo "=== Patching xcconfig files to remove -Werror flags ==="
+          find Pods/Target\ Support\ Files -name "*.xcconfig" -type f -exec sed -i '' 's/-Werror[^[:space:]]*//g' {} \; 2>/dev/null || true
+          find Pods/Target\ Support\ Files -name "*.xcconfig" -type f -exec sed -i '' 's/WARNING_CFLAGS = /WARNING_CFLAGS = -w /g' {} \; 2>/dev/null || true
+          find Pods/Target\ Support\ Files -name "*.xcconfig" -type f -exec sed -i '' 's/GCC_TREAT_WARNINGS_AS_ERRORS = YES/GCC_TREAT_WARNINGS_AS_ERRORS = NO/g' {} \; 2>/dev/null || true
+          
+          # Also patch the Pods project.pbxproj to remove -Werror from build settings
+          if [ -f "Pods/Pods.xcodeproj/project.pbxproj" ]; then
+            sed -i '' 's/-Werror[^[:space:]]*//g' Pods/Pods.xcodeproj/project.pbxproj 2>/dev/null || true
+            sed -i '' 's/GCC_WARN_INHIBIT_ALL_WARNINGS = NO/GCC_WARN_INHIBIT_ALL_WARNINGS = YES/g' Pods/Pods.xcodeproj/project.pbxproj 2>/dev/null || true
+          fi
+          
+          # List patched files
+          echo "=== Verifying patched RNFBMessaging xcconfig ==="
+          cat Pods/Target\ Support\ Files/RNFBMessaging/RNFBMessaging.release.xcconfig 2>/dev/null || echo "File not found"
+          echo "=== xcconfig patching complete ==="
 
       - name: Set up code signing
         script: |
