@@ -117,13 +117,9 @@ target 'TowRides' do
         # Add Swift library paths for all targets
         config.build_settings['LIBRARY_SEARCH_PATHS'] = '$(inherited) $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(SDKROOT)/usr/lib/swift'
         
-        # Aggressive warning suppression for all targets - STRIP all -Werror flags
-        other_cflags = Array(config.build_settings['OTHER_CFLAGS'])
-        other_cflags << '$(inherited)' if other_cflags.empty?
-        # Remove ANY -Werror flags
-        other_cflags = other_cflags.reject { |flag| flag.to_s.include?('-Werror') }
-        # Add aggressive suppression
-        other_cflags << '-w'  # Suppress all warnings
+        # Aggressive warning suppression for all targets - COMPLETELY REPLACE OTHER_CFLAGS
+        # This is necessary because $(inherited) brings in -Werror flags
+        other_cflags = ['-w']  # Start fresh with -w (suppress all warnings)
         other_cflags << '-Wno-error'
         other_cflags << '-Wno-error=non-modular-include-in-framework-module'
         other_cflags << '-Wno-error=deprecated-objc-isa-usage'
@@ -207,12 +203,8 @@ target 'TowRides' do
           config.build_settings['CLANG_ENABLE_MODULES'] = 'NO'
           config.build_settings['CLANG_MODULES_AUTOLINK'] = 'NO'
           
-          # Strip ALL -Werror for RNFB pods
-          rnfb_cflags = Array(config.build_settings['OTHER_CFLAGS'])
-          rnfb_cflags = rnfb_cflags.reject { |flag| flag.to_s.include?('-Werror') }
-          rnfb_cflags << '-w'
-          rnfb_cflags << '-Wno-error'
-          rnfb_cflags << '-Wno-everything'
+          # Strip ALL -Werror for RNFB pods - COMPLETELY REPLACE flags
+          rnfb_cflags = ['-w', '-Wno-error', '-Wno-everything']
           config.build_settings['OTHER_CFLAGS'] = rnfb_cflags
           
           # Add specific header search paths for RNFB pods
