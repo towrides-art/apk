@@ -137,6 +137,96 @@ PRAGMAEOF
 
           npm install --legacy-peer-deps
           npx patch-package
+          
+          # === CRITICAL: Patch RNFB files immediately after npm install ===
+          echo "=== PATCHING RNFB FILES AFTER NPM INSTALL ==="
+          
+          # Create pragma header
+          cat > /tmp/pragma_header.txt << 'PRAGMAEOF'
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Werror"
+#pragma clang diagnostic ignored "-Wdocumentation"
+#pragma clang diagnostic ignored "-Wdeprecated-objc-isa-usage"
+#pragma clang diagnostic ignored "-Wobjc-root-class"
+#pragma clang diagnostic ignored "-Wreturn-type"
+#pragma clang diagnostic ignored "-Wunreachable-code"
+#pragma clang diagnostic ignored "-Wimplicit-retain-self"
+#pragma clang diagnostic ignored "-Wduplicate-method-match"
+#pragma clang diagnostic ignored "-Wparentheses"
+#pragma clang diagnostic ignored "-Wswitch"
+#pragma clang diagnostic ignored "-Wunused-function"
+#pragma clang diagnostic ignored "-Wunused-variable"
+#pragma clang diagnostic ignored "-Wunused-value"
+#pragma clang diagnostic ignored "-Wempty-body"
+#pragma clang diagnostic ignored "-Wuninitialized"
+#pragma clang diagnostic ignored "-Wconditional-uninitialized"
+#pragma clang diagnostic ignored "-Wshadow"
+#pragma clang diagnostic ignored "-Wfour-char-constants"
+#pragma clang diagnostic ignored "-Wconversion"
+#pragma clang diagnostic ignored "-Wconstant-conversion"
+#pragma clang diagnostic ignored "-Wint-conversion"
+#pragma clang diagnostic ignored "-Wbool-conversion"
+#pragma clang diagnostic ignored "-Wenum-conversion"
+#pragma clang diagnostic ignored "-Wfloat-conversion"
+#pragma clang diagnostic ignored "-Wnon-literal-null-conversion"
+#pragma clang diagnostic ignored "-Wobjc-literal-conversion"
+#pragma clang diagnostic ignored "-Wshorten-64-to-32"
+#pragma clang diagnostic ignored "-Wpointer-sign"
+#pragma clang diagnostic ignored "-Wselector"
+#pragma clang diagnostic ignored "-Wstrict-selector-match"
+#pragma clang diagnostic ignored "-Wundeclared-selector"
+#pragma clang diagnostic ignored "-Wdeprecated-implementations"
+#pragma clang diagnostic ignored "-Wprotocol"
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+#pragma clang diagnostic ignored "-Wsign-conversion"
+#pragma clang diagnostic ignored "-Winfinite-recursion"
+#pragma clang diagnostic ignored "-Wcomma"
+#pragma clang diagnostic ignored "-Wblock-capture-autoreleasing"
+#pragma clang diagnostic ignored "-Wstrict-prototypes"
+#pragma clang diagnostic ignored "-Wunguarded-availability"
+#pragma clang diagnostic ignored "-Wmissing-braces"
+#pragma clang diagnostic ignored "-Wmissing-field-initializers"
+#pragma clang diagnostic ignored "-Wmissing-prototypes"
+#pragma clang diagnostic ignored "-Wtrigraphs"
+#pragma clang diagnostic ignored "-Wunknown-pragmas"
+#pragma clang diagnostic ignored "-Wnon-modular-include-in-framework-module"
+
+PRAGMAEOF
+          
+          # Patch RNFBMessaging+AppDelegate.m
+          MESSAGING_FILE="node_modules/@react-native-firebase/messaging/ios/RNFBMessaging/RNFBMessaging+AppDelegate.m"
+          if [ -f "$MESSAGING_FILE" ]; then
+            echo "Patching RNFBMessaging+AppDelegate.m..."
+            cat /tmp/pragma_header.txt "$MESSAGING_FILE" > /tmp/messaging_patched.m
+            echo "" >> /tmp/messaging_patched.m
+            echo "#pragma clang diagnostic pop" >> /tmp/messaging_patched.m
+            mv /tmp/messaging_patched.m "$MESSAGING_FILE"
+            echo "[SUCCESS] RNFBMessaging+AppDelegate.m patched"
+            head -3 "$MESSAGING_FILE"
+          else
+            echo "[ERROR] File not found: $MESSAGING_FILE"
+            ls -la node_modules/@react-native-firebase/messaging/ios/RNFBMessaging/ 2>/dev/null || echo "Directory not found"
+            exit 1
+          fi
+          
+          # Patch RNFBAuthModule.m
+          AUTH_FILE="node_modules/@react-native-firebase/auth/ios/RNFBAuth/RNFBAuthModule.m"
+          if [ -f "$AUTH_FILE" ]; then
+            echo "Patching RNFBAuthModule.m..."
+            sed -i.bak 's/#import <FirebaseAuth\/FirebaseAuth-Swift.h>/\/\/ BYPASSED: #import <FirebaseAuth\/FirebaseAuth-Swift.h>/g' "$AUTH_FILE"
+            cat /tmp/pragma_header.txt "$AUTH_FILE" > /tmp/auth_patched.m
+            echo "" >> /tmp/auth_patched.m
+            echo "#pragma clang diagnostic pop" >> /tmp/auth_patched.m
+            mv /tmp/auth_patched.m "$AUTH_FILE"
+            echo "[SUCCESS] RNFBAuthModule.m patched"
+            head -3 "$AUTH_FILE"
+          else
+            echo "[ERROR] File not found: $AUTH_FILE"
+            ls -la node_modules/@react-native-firebase/auth/ios/RNFBAuth/ 2>/dev/null || echo "Directory not found"
+            exit 1
+          fi
+          
+          echo "=== RNFB PATCHING COMPLETE ==="
 
           cd ios
           pod deintegrate
@@ -1416,6 +1506,7 @@ ULTRAEND
             CLANG_ENABLE_MODULES=NO \
             CLANG_MODULES_AUTOLINK=NO \
             WARNING_CFLAGS="-w" \
+            OTHER_CFLAGS="-w" \
             CC="$(pwd)/ios/build_patch/clang_wrapper.sh" \
             CXX="$(pwd)/ios/build_patch/clang_wrapper.sh" \
             EXCLUDED_ARCHS[sdk=iphonesimulator*]="x86_64 arm64" \
