@@ -108,6 +108,26 @@ workflows:
           export NODE_BINARY
           export PATH="$(dirname "$NODE_BINARY"):$PATH"
 
+          # CRITICAL: Delete Firebase BEFORE pod install in this step
+          echo "=== BUILD IPA: Pre-pod-install Firebase deletion ==="
+          set -x
+          ls node_modules/@react-native-firebase 2>/dev/null && echo "FIREBASE EXISTS - DELETING" || echo "Firebase already gone"
+          rm -rf node_modules/@react-native-firebase
+          rm -rf node_modules/firebase
+          rm -rf node_modules/@firebase
+          # Force delete with sudo if needed
+          if [ -d "node_modules/@react-native-firebase" ]; then
+            sudo rm -rf node_modules/@react-native-firebase || true
+          fi
+          # Verify deletion
+          if [ -d "node_modules/@react-native-firebase" ]; then
+            echo "FATAL: Cannot delete Firebase!"
+            ls -la node_modules/@react-native-firebase/
+            exit 1
+          fi
+          echo "=== FIREBASE CONFIRMED DELETED ==="
+          set +x
+
           cd ios
 
           cat <<EOF > .xcode.env
@@ -131,6 +151,9 @@ workflows:
 
           pod install --repo-update
 
+          echo "=== POST POD-INSTALL: Checking Podfile.lock ==="
+          grep -i "firebase\|RNFB" Podfile.lock && echo "WARNING: Firebase pods still in lock!" || echo "Clean Podfile.lock"
+
           echo "=== FINAL FIREBASE POD CLEANUP ==="
           rm -rf Pods/Firebase*
           rm -rf Pods/RNFB*
@@ -138,6 +161,8 @@ workflows:
           rm -rf Pods/GoogleDataTransport
           rm -rf Pods/Headers/Public/Firebase*
           rm -rf Pods/Headers/Public/RNFB*
+          rm -rf Pods/Headers/Private/Firebase*
+          rm -rf Pods/Headers/Private/RNFB*
 
           cd ..
 
