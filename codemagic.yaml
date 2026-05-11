@@ -42,9 +42,14 @@ workflows:
         script: |
           export DEVELOPER_DIR="$DEVELOPER_DIR"
           echo "=== VERIFYING FIREBASE REMOVAL BEFORE POD INSTALL ==="
-          rm -rf node_modules/@react-native-firebase 2>/dev/null || true
-          rm -rf node_modules/firebase 2>/dev/null || true
-          ls -la node_modules/@react-native-firebase 2>/dev/null || echo "No Firebase in node_modules"
+          # CRITICAL: Delete RNFBMessaging iOS folder to prevent autolinking
+          # Android will still work as we're only deleting iOS files
+          echo "Deleting RNFBMessaging iOS files..."
+          rm -rf node_modules/@react-native-firebase/messaging/ios 2>/dev/null || true
+          rm -rf node_modules/@react-native-firebase/app/ios 2>/dev/null || true
+          rm -rf node_modules/@react-native-firebase/auth/ios 2>/dev/null || true
+          echo "RNFB iOS folders deleted"
+          ls -la node_modules/@react-native-firebase/messaging/ 2>/dev/null || echo "No messaging package"
           rm -rf ~/Library/Developer/Xcode/DerivedData
           rm -rf ~/Library/Caches/CocoaPods
           rm -rf ios/build
