@@ -15,6 +15,14 @@ require Pod::Executable.execute_command('node', ['-p',
 platform :ios, '15.1'
 prepare_react_native_project!
 
+# Delete Firebase packages before CocoaPods processes them
+pre_install do |installer|
+  puts "Removing Firebase packages from node_modules before pod install..."
+  system("rm -rf ../node_modules/@react-native-firebase")
+  system("rm -rf ../node_modules/firebase")
+  puts "Firebase packages removed"
+end
+
 use_frameworks! :linkage => :static
 
 target 'TowRides' do

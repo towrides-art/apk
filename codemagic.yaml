@@ -22,8 +22,13 @@ workflows:
       - name: Install dependencies
         script: |
           rm -rf node_modules
+          rm -f package-lock.json
           npm install --legacy-peer-deps
-          npx patch-package
+          echo "=== REMOVING FIREBASE PACKAGES IMMEDIATELY ==="
+          rm -rf node_modules/@react-native-firebase 2>/dev/null || true
+          rm -rf node_modules/firebase 2>/dev/null || true
+          ls -la node_modules/@react-native-firebase 2>/dev/null || echo "No Firebase packages found"
+          npx patch-package || echo "No patches to apply"
           echo "=== PATCHING COMPLETE ==="
       - name: Use Xcode 16.0
         script: |
@@ -36,6 +41,10 @@ workflows:
       - name: Clean and Install Pods
         script: |
           export DEVELOPER_DIR="$DEVELOPER_DIR"
+          echo "=== VERIFYING FIREBASE REMOVAL BEFORE POD INSTALL ==="
+          rm -rf node_modules/@react-native-firebase 2>/dev/null || true
+          rm -rf node_modules/firebase 2>/dev/null || true
+          ls -la node_modules/@react-native-firebase 2>/dev/null || echo "No Firebase in node_modules"
           rm -rf ~/Library/Developer/Xcode/DerivedData
           rm -rf ~/Library/Caches/CocoaPods
           rm -rf ios/build
@@ -46,6 +55,13 @@ workflows:
           pod cache clean --all
           pod repo update
           pod install --repo-update
+          echo "=== CHECKING FOR FIREBASE PODS ==="
+          cat Podfile.lock | grep -i firebase || echo "No Firebase pods found in Podfile.lock"
+          echo "=== REMOVING ANY FIREBASE PODS IF PRESENT ==="
+          rm -rf Pods/Firebase* 2>/dev/null || true
+          rm -rf Pods/RNFB* 2>/dev/null || true
+          rm -rf Pods/Headers/Public/Firebase* 2>/dev/null || true
+          ls -la Pods | grep -i firebase || echo "No Firebase pods in Pods directory"
           echo "=== POD INSTALL COMPLETE ==="
       - name: Set up code signing
         script: |
