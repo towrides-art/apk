@@ -21,15 +21,28 @@ workflows:
           rm -rf __MACOSX
       - name: Install dependencies
         script: |
+          # NUCLEAR: Clean everything first - no cache
           rm -rf node_modules
           rm -f package-lock.json
-          npm install --legacy-peer-deps
-          echo "=== REMOVING FIREBASE PACKAGES IMMEDIATELY ==="
-          rm -rf node_modules/@react-native-firebase 2>/dev/null || true
-          rm -rf node_modules/firebase 2>/dev/null || true
-          ls -la node_modules/@react-native-firebase 2>/dev/null || echo "No Firebase packages found"
-          npx patch-package || echo "No patches to apply"
-          echo "=== PATCHING COMPLETE ==="
+          rm -f yarn.lock
+          npm cache clean --force
+          # Fresh install
+          npm install --legacy-peer-deps --no-audit --no-fund
+          echo "=== DETECTING FIREBASE PACKAGES ==="
+          find node_modules -maxdepth 3 -name "*firebase*" -type d 2>/dev/null || echo "None found"
+          find node_modules -maxdepth 3 -name "*RNFB*" -type d 2>/dev/null || echo "None found"
+          echo "=== FORCE DELETING ALL FIREBASE PACKAGES ==="
+          rm -rf node_modules/@react-native-firebase
+          rm -rf node_modules/firebase
+          rm -rf node_modules/@firebase
+          # Verify deletion
+          if [ -d "node_modules/@react-native-firebase" ]; then
+            echo "ERROR: Firebase still exists! Force removing..."
+            chmod -R 777 node_modules/@react-native-firebase
+            rm -rf node_modules/@react-native-firebase
+          fi
+          ls node_modules/@react-native-firebase 2>/dev/null && echo "STILL EXISTS!" || echo "DELETED SUCCESSFULLY"
+          npx patch-package || echo "No patches"
       - name: Verify Firebase Removed
         script: |
           echo "=== VERIFYING FIREBASE REMOVAL ==="
@@ -46,32 +59,45 @@ workflows:
       - name: Clean and Install Pods
         script: |
           export DEVELOPER_DIR="$DEVELOPER_DIR"
-          echo "=== VERIFYING FIREBASE REMOVAL BEFORE POD INSTALL ==="
-          # CRITICAL: Delete RNFBMessaging iOS folder to prevent autolinking
-          # Android will still work as we're only deleting iOS files
-          echo "Deleting RNFBMessaging iOS files..."
-          rm -rf node_modules/@react-native-firebase/messaging/ios 2>/dev/null || true
-          rm -rf node_modules/@react-native-firebase/app/ios 2>/dev/null || true
-          rm -rf node_modules/@react-native-firebase/auth/ios 2>/dev/null || true
-          echo "RNFB iOS folders deleted"
-          ls -la node_modules/@react-native-firebase/messaging/ 2>/dev/null || echo "No messaging package"
+          # NUCLEAR: Force delete ALL Firebase from node_modules (in case it came back)
+          echo "=== FINAL FIREBASE DELETION ==="
+          rm -rf node_modules/@react-native-firebase
+          rm -rf node_modules/firebase
+          rm -rf node_modules/@firebase
+          if [ -d "node_modules/@react-native-firebase" ]; then
+            echo "FATAL: Firebase persists! Trying with sudo..."
+            sudo rm -rf node_modules/@react-native-firebase || true
+          fi
+          ls node_modules/@react-native-firebase 2>/dev/null && echo "STILL EXISTS!" || echo "CONFIRMED DELETED"
+          # Clean all iOS build artifacts
           rm -rf ~/Library/Developer/Xcode/DerivedData
           rm -rf ~/Library/Caches/CocoaPods
           rm -rf ios/build
           rm -rf ios/Pods
           rm -rf ios/Podfile.lock
           cd ios
-          pod deintegrate
+          pod deintegrate || true
           pod cache clean --all
-          pod repo update
           pod install --repo-update
-          echo "=== CHECKING FOR FIREBASE PODS ==="
-          cat Podfile.lock | grep -i firebase || echo "No Firebase pods found in Podfile.lock"
-          echo "=== REMOVING ANY FIREBASE PODS IF PRESENT ==="
-          rm -rf Pods/Firebase* 2>/dev/null || true
-          rm -rf Pods/RNFB* 2>/dev/null || true
-          rm -rf Pods/Headers/Public/Firebase* 2>/dev/null || true
-          ls -la Pods | grep -i firebase || echo "No Firebase pods in Pods directory"
+          echo "=== POST-INSTALL FIREBASE CHECK ==="
+          if [ -f Podfile.lock ]; then
+            grep -i "firebase\|RNFB" Podfile.lock && echo "WARNING: Firebase pods in lock!" || echo "Clean Podfile.lock"
+          fi
+          # Force delete any Firebase pods that snuck in
+          rm -rf Pods/Firebase*
+          rm -rf Pods/RNFB*
+          rm -rf Pods/FirebaseCore*
+          rm -rf Pods/FirebaseAuth*
+          rm -rf Pods/FirebaseMessaging*
+          rm -rf Pods/FirebaseInstallations*
+          rm -rf Pods/GoogleUtilities
+          rm -rf Pods/GoogleDataTransport
+          rm -rf Pods/Headers/Public/Firebase*
+          rm -rf Pods/Headers/Public/RNFB*
+          rm -rf Pods/Headers/Private/Firebase*
+          rm -rf Pods/Headers/Private/RNFB*
+          rm -rf Pods/Target\ Support\ Files/Firebase*
+          rm -rf Pods/Target\ Support\ Files/RNFB*
           echo "=== POD INSTALL COMPLETE ==="
       - name: Set up code signing
         script: |
