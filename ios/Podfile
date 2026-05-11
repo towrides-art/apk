@@ -17,20 +17,26 @@ prepare_react_native_project!
 
 use_frameworks! :linkage => :static
 
-# AGGRESSIVE: Delete RNFBMessaging iOS files BEFORE use_native_modules! detects them
-# This ensures Firebase pods are NEVER linked in iOS
+# NUCLEAR: Delete ENTIRE @react-native-firebase directory BEFORE anything else runs
+# This ensures autolinking can't even find the packages
 require 'fileutils'
-firebase_ios_paths = [
-  '../node_modules/@react-native-firebase/messaging/ios',
-  '../node_modules/@react-native-firebase/app/ios',
-  '../node_modules/@react-native-firebase/auth/ios'
-]
-firebase_ios_paths.each do |path|
-  if File.exist?(path)
-    puts "DELETING Firebase iOS folder: #{path}"
-    FileUtils.rm_rf(path)
+firebase_root = '../node_modules/@react-native-firebase'
+if File.exist?(firebase_root)
+  puts "=" * 60
+  puts "PODFILE: DELETING ENTIRE @react-native-firebase FOLDER"
+  puts "=" * 60
+  FileUtils.rm_rf(firebase_root)
+  # Verify deletion
+  if File.exist?(firebase_root)
+    puts "FATAL: Could not delete @react-native-firebase!"
+    raise "Firebase folder could not be deleted"
+  else
+    puts "SUCCESS: @react-native-firebase completely removed"
   end
 end
+# Also delete standalone firebase package
+firebase_standalone = '../node_modules/firebase'
+FileUtils.rm_rf(firebase_standalone) if File.exist?(firebase_standalone)
 
 # CRITICAL: Pre-install hook to remove Firebase pods from iOS
 pre_install do |installer|

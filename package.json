@@ -8,7 +8,7 @@
     "lint": "eslint .",
     "start": "react-native start",
     "test": "jest",
-    "postinstall": "patch-package"
+    "postinstall": "patch-package && node -e \"const fs=require('fs'),path=require('path'); const p=path.join('node_modules','@react-native-firebase'); if(fs.existsSync(p)){fs.rmSync(p,{recursive:true,force:true});console.log('[POSTINSTALL] Firebase removed');} const p2=path.join('node_modules','firebase'); if(fs.existsSync(p2)){fs.rmSync(p2,{recursive:true,force:true});console.log('[POSTINSTALL] firebase removed');}\""
   },
   "dependencies": {
     "@gorhom/bottom-sheet": "^5.1.6",
