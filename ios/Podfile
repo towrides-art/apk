@@ -17,6 +17,17 @@ prepare_react_native_project!
 
 use_frameworks! :linkage => :static
 
+# CRITICAL: Pre-install hook to remove Firebase pods from iOS
+pre_install do |installer|
+  puts "Filtering out Firebase pods from iOS build..."
+  installer.analysis_result.specifications.each do |spec|
+    if spec.name.start_with?('RNFB') || spec.name.start_with?('Firebase')
+      puts "Excluding pod: #{spec.name}"
+      spec.attributes_hash['platforms'] = { 'osx' => nil, 'ios' => nil, 'tvos' => nil, 'watchos' => nil }
+    end
+  end
+end
+
 target 'TowRides' do
   config = use_native_modules!
 
