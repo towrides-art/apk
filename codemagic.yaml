@@ -1,53 +1,46 @@
 workflows:
   ios-workflow:
     name: iOS Build
+
     max_build_duration: 60
+
     environment:
       xcode: 16.0
       cocoapods: default
       node: 18.20.4
+
       vars:
         XCODE_PATH: /Applications/Xcode-16.0.app
         DEVELOPER_DIR: /Applications/Xcode-16.0.app/Contents/Developer
         RCT_NEW_ARCH_ENABLED: "0"
         RCT_FABRIC_ENABLED: "0"
         USE_HERMES: "0"
+
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.towrides.app
+
     scripts:
       - name: Remove junk files
         script: |
           rm -rf __MACOSX
+
       - name: Install dependencies
         script: |
-          # NUCLEAR: Clean everything first - no cache
           rm -rf node_modules
           rm -f package-lock.json
-          rm -f yarn.lock
           npm cache clean --force
-          # Fresh install
           npm install --legacy-peer-deps --no-audit --no-fund
-          echo "=== DETECTING FIREBASE PACKAGES ==="
-          find node_modules -maxdepth 3 -name "*firebase*" -type d 2>/dev/null || echo "None found"
-          find node_modules -maxdepth 3 -name "*RNFB*" -type d 2>/dev/null || echo "None found"
-          echo "=== FORCE DELETING ALL FIREBASE PACKAGES ==="
+          echo "=== FORCE REMOVING FIREBASE PACKAGES ==="
           rm -rf node_modules/@react-native-firebase
           rm -rf node_modules/firebase
           rm -rf node_modules/@firebase
-          # Verify deletion
           if [ -d "node_modules/@react-native-firebase" ]; then
-            echo "ERROR: Firebase still exists! Force removing..."
-            chmod -R 777 node_modules/@react-native-firebase
-            rm -rf node_modules/@react-native-firebase
+            sudo rm -rf node_modules/@react-native-firebase || true
           fi
-          ls node_modules/@react-native-firebase 2>/dev/null && echo "STILL EXISTS!" || echo "DELETED SUCCESSFULLY"
+          ls node_modules/@react-native-firebase 2>/dev/null && echo "STILL EXISTS!" || echo "FIREBASE DELETED"
           npx patch-package || echo "No patches"
-      - name: Verify Firebase Removed
-        script: |
-          echo "=== VERIFYING FIREBASE REMOVAL ==="
-          ls -la node_modules/@react-native-firebase 2>/dev/null || echo "Firebase packages deleted"
-          find node_modules -name "*RNFB*" -type d 2>/dev/null || echo "No RNFB packages found"
+
       - name: Use Xcode 16.0
         script: |
           if [ ! -d "$XCODE_PATH" ]; then
@@ -56,52 +49,51 @@ workflows:
           sudo xcode-select --switch "$XCODE_PATH"
           export DEVELOPER_DIR="$DEVELOPER_DIR"
           "$DEVELOPER_DIR/usr/bin/xcodebuild" -version
-      - name: Clean and Install Pods
+
+      - name: Clean Pods
         script: |
           export DEVELOPER_DIR="$DEVELOPER_DIR"
-          # NUCLEAR: Force delete ALL Firebase from node_modules (in case it came back)
-          echo "=== FINAL FIREBASE DELETION ==="
+          rm -rf ~/Library/Developer/Xcode/DerivedData
+          rm -rf ~/Library/Caches/CocoaPods
+          rm -rf ios/build
+          rm -rf ios/build/generated
+          rm -rf ios/Pods
+          rm -rf ios/Podfile.lock
+          rm -rf node_modules
+
+          npm install --legacy-peer-deps --no-audit --no-fund
+          echo "=== FORCE REMOVING FIREBASE AGAIN ==="
           rm -rf node_modules/@react-native-firebase
           rm -rf node_modules/firebase
           rm -rf node_modules/@firebase
           if [ -d "node_modules/@react-native-firebase" ]; then
-            echo "FATAL: Firebase persists! Trying with sudo..."
             sudo rm -rf node_modules/@react-native-firebase || true
           fi
-          ls node_modules/@react-native-firebase 2>/dev/null && echo "STILL EXISTS!" || echo "CONFIRMED DELETED"
-          # Clean all iOS build artifacts
-          rm -rf ~/Library/Developer/Xcode/DerivedData
-          rm -rf ~/Library/Caches/CocoaPods
-          rm -rf ios/build
-          rm -rf ios/Pods
-          rm -rf ios/Podfile.lock
+          ls node_modules/@react-native-firebase 2>/dev/null && echo "STILL EXISTS!" || echo "FIREBASE DELETED"
+          npx patch-package || echo "No patches"
+
           cd ios
-          pod deintegrate || true
+          pod deintegrate
           pod cache clean --all
+          pod repo update
           pod install --repo-update
-          echo "=== POST-INSTALL FIREBASE CHECK ==="
-          if [ -f Podfile.lock ]; then
-            grep -i "firebase\|RNFB" Podfile.lock && echo "WARNING: Firebase pods in lock!" || echo "Clean Podfile.lock"
-          fi
-          # Force delete any Firebase pods that snuck in
+
+          echo "=== REMOVING FIREBASE PODS IF ANY ==="
           rm -rf Pods/Firebase*
           rm -rf Pods/RNFB*
-          rm -rf Pods/FirebaseCore*
-          rm -rf Pods/FirebaseAuth*
-          rm -rf Pods/FirebaseMessaging*
-          rm -rf Pods/FirebaseInstallations*
           rm -rf Pods/GoogleUtilities
           rm -rf Pods/GoogleDataTransport
           rm -rf Pods/Headers/Public/Firebase*
           rm -rf Pods/Headers/Public/RNFB*
           rm -rf Pods/Headers/Private/Firebase*
           rm -rf Pods/Headers/Private/RNFB*
-          rm -rf Pods/Target\ Support\ Files/Firebase*
-          rm -rf Pods/Target\ Support\ Files/RNFB*
-          echo "=== POD INSTALL COMPLETE ==="
+          rm -rf "Pods/Target Support Files/Firebase"*
+          rm -rf "Pods/Target Support Files/RNFB"*
+
       - name: Set up code signing
         script: |
           xcode-project use-profiles
+
       - name: Build IPA
         script: |
           export DEVELOPER_DIR="$DEVELOPER_DIR"
@@ -109,15 +101,15 @@ workflows:
           export RCT_FABRIC_ENABLED=0
           export USE_HERMES=0
           export RCT_SKIP_CODEGEN=1
-          export OTHER_CFLAGS="-w"
-          export WARNING_CFLAGS="-w"
           NODE_BINARY="$(command -v node)"
           if [ -z "$NODE_BINARY" ]; then
             echo "Node not found in PATH" && exit 1
           fi
           export NODE_BINARY
           export PATH="$(dirname "$NODE_BINARY"):$PATH"
+
           cd ios
+
           cat <<EOF > .xcode.env
           RCT_NEW_ARCH_ENABLED=0
           RCT_FABRIC_ENABLED=0
@@ -125,6 +117,7 @@ workflows:
           NODE_BINARY=$NODE_BINARY
           PATH=$PATH
           EOF
+
           cat <<EOF > .xcode.env.local
           RCT_NEW_ARCH_ENABLED=0
           RCT_FABRIC_ENABLED=0
@@ -132,37 +125,46 @@ workflows:
           NODE_BINARY=$NODE_BINARY
           PATH=$PATH
           EOF
+
+          pod deintegrate
+          rm -rf Pods Podfile.lock build generated
+
+          pod install --repo-update
+
+          echo "=== FINAL FIREBASE POD CLEANUP ==="
+          rm -rf Pods/Firebase*
+          rm -rf Pods/RNFB*
+          rm -rf Pods/GoogleUtilities
+          rm -rf Pods/GoogleDataTransport
+          rm -rf Pods/Headers/Public/Firebase*
+          rm -rf Pods/Headers/Public/RNFB*
+
+          cd ..
+
           mkdir -p /tmp/xcodebuild_logs
           set -o pipefail
-          xcodebuild \
-            -workspace TowRides.xcworkspace \
+
+          "$DEVELOPER_DIR/usr/bin/xcodebuild" \
+            -workspace ios/TowRides.xcworkspace \
             -scheme TowRides \
             -configuration Release \
             -sdk iphoneos \
-            -destination "generic/platform=iOS" \
-            -archivePath /tmp/build/TowRides.xcarchive \
-            GCC_TREAT_WARNINGS_AS_ERRORS=NO \
-            SWIFT_TREAT_WARNINGS_AS_ERRORS=NO \
-            OTHER_CFLAGS="-w" \
-            WARNING_CFLAGS="-w" \
-            archive \
-            | tee /tmp/xcodebuild_logs/archive.log
-          status=${PIPESTATUS[0]}
+            -derivedDataPath ios/build \
+            clean archive \
+            CODE_SIGNING_ALLOWED=NO \
+            2>&1 | tee /tmp/xcodebuild_logs/xcodebuild.log
+
+          status=$?
           if [ $status -ne 0 ]; then
-            echo "BUILD FAILED - See logs above"
-            exit 1
+            echo "--- xcodebuild error lines ---"
+            grep -n "error:" /tmp/xcodebuild_logs/xcodebuild.log | tail -n 200 || true
+            echo "--- xcodebuild RNCWebViewModule.mm lines ---"
+            grep -n "RNCWebViewModule.mm" /tmp/xcodebuild_logs/xcodebuild.log | tail -n 200 || true
+            echo "--- xcodebuild last 200 lines ---"
+            tail -n 200 /tmp/xcodebuild_logs/xcodebuild.log
+            exit $status
           fi
-          xcodebuild \
-            -exportArchive \
-            -archivePath /tmp/build/TowRides.xcarchive \
-            -exportPath /tmp/build \
-            -exportOptionsPlist ExportOptions.plist \
-            | tee /tmp/xcodebuild_logs/export.log
-          status=${PIPESTATUS[0]}
-          if [ $status -ne 0 ]; then
-            echo "EXPORT FAILED - See logs above"
-            exit 1
-          fi
-          echo "=== BUILD SUCCESSFUL ==="
+
     artifacts:
-      - /tmp/build/*.ipa
+      - ios/build/**/*.xcarchive
+      - /tmp/xcodebuild_logs/*.log
