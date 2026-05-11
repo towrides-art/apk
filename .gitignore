@@ -28,6 +28,9 @@ build/
 .idea
 .gradle
 local.properties
+
+# Node
+package-lock.json
 *.iml
 *.hprof
 .cxx/
