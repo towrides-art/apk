@@ -34,15 +34,26 @@ workflows:
           set -e
           rm -f package-lock.json yarn.lock
           npm cache clean --force
-          npm install --legacy-peer-deps --no-audit --no-fund
 
-          echo "=== REMOVING FIREBASE + NOTIFEE ==="
+          # --ignore-scripts: postinstall nahi chalega during install
+          npm install --legacy-peer-deps --no-audit --no-fund --ignore-scripts
+
+          echo "=== NUCLEAR FIREBASE + NOTIFEE REMOVAL ==="
           rm -rf node_modules/@react-native-firebase
           rm -rf node_modules/firebase
           rm -rf node_modules/@firebase
           rm -rf node_modules/@notifee
-          echo "Removal done"
 
+          # Verify deletion
+          for pkg in "@react-native-firebase" "firebase" "@firebase" "@notifee"; do
+            if [ -d "node_modules/$pkg" ]; then
+              echo "FATAL: $pkg still exists after deletion!"
+              exit 1
+            fi
+          done
+          echo "CONFIRMED: All Firebase/Notifee packages deleted"
+
+          # Now run patch-package manually (scripts were skipped above)
           npx patch-package || echo "No patches"
 
       - name: Configure Xcode
@@ -56,22 +67,25 @@ workflows:
           set -e
           export DEVELOPER_DIR="$DEVELOPER_DIR"
 
-          rm -rf node_modules/@react-native-firebase
-          rm -rf node_modules/firebase
-          rm -rf node_modules/@firebase
-          rm -rf node_modules/@notifee
+          # Re-confirm Firebase gone before pod install
+          rm -rf node_modules/@react-native-firebase node_modules/firebase node_modules/@firebase node_modules/@notifee
+          echo "Pre-pod Firebase check:"
+          ls node_modules | grep -i firebase || echo "  -> No firebase in node_modules"
+          ls node_modules | grep -i notifee || echo "  -> No notifee in node_modules"
 
           cd ios
           pod cache clean --all
-          pod install --repo-update
+          pod install --repo-update 2>&1
 
           echo "=== Podfile.lock Firebase check ==="
-          if grep -qi "RNFB\|RNFBApp\|RNFBMessaging\|RNFBAuth\|FirebaseCore\|FirebaseAuth\|FirebaseMessaging" Podfile.lock; then
+          if grep -qi "RNFB\|FirebaseCore\|FirebaseAuth\|FirebaseMessaging\|GoogleDataTransport\|FirebaseInstallations" Podfile.lock; then
             echo "FATAL: Firebase pods found in Podfile.lock!"
-            grep -i "RNFB\|Firebase" Podfile.lock
+            grep -i "RNFB\|Firebase\|GoogleData" Podfile.lock
             exit 1
           fi
           echo "CLEAN: No Firebase pods in Podfile.lock"
+          echo "=== All installed pods ==="
+          grep -E "^  - " Podfile.lock | head -60
 
       - name: Set up code signing
         script: |
@@ -96,6 +110,10 @@ workflows:
           cp ios/.xcode.env ios/.xcode.env.local
 
           mkdir -p /tmp/xcodebuild_logs
+
+          # Nuke DerivedData to prevent stale build artifacts
+          rm -rf ~/Library/Developer/Xcode/DerivedData
+          rm -rf ios/build
 
           # NOTE: working dir is project root, NOT ios/
           # So -workspace path must include ios/
