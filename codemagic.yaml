@@ -12,6 +12,7 @@ workflows:
         RCT_FABRIC_ENABLED: "0"
         USE_HERMES: "0"
         RCT_SKIP_CODEGEN: "1"
+        FORCE_CLEAN_BUILD: "20260513-v3"
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.towrides.app
