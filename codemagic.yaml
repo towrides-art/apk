@@ -12,7 +12,7 @@ workflows:
         RCT_FABRIC_ENABLED: "0"
         USE_HERMES: "0"
         RCT_SKIP_CODEGEN: "1"
-        FORCE_CLEAN_BUILD: "20260513-v5"
+        FORCE_CLEAN_BUILD: "20260513-v6"
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.towrides.app
@@ -111,6 +111,29 @@ workflows:
           export RCT_FABRIC_ENABLED=0
           export USE_HERMES=0
           export RCT_SKIP_CODEGEN=1
+
+          # FINAL HARD DELETE - last line of defense before xcodebuild
+          echo "=== FINAL Firebase purge ==="
+          rm -rf node_modules/@react-native-firebase
+          rm -rf node_modules/firebase
+          rm -rf node_modules/@firebase
+          rm -rf node_modules/@notifee
+          ls node_modules | grep -iE "firebase|RNFB|notifee" && echo "WARNING: Firebase still in node_modules!" && exit 1 || echo "OK: node_modules clean"
+
+          # If RNFB still in Podfile.lock, re-run pod install clean
+          if grep -qiE "RNFBApp|RNFBAuth|RNFBMessaging|FirebaseCore" ios/Podfile.lock 2>/dev/null; then
+            echo "RNFB in Podfile.lock - re-running clean pod install"
+            rm -rf ios/Pods ios/Podfile.lock ios/build
+            cd ios
+            pod deintegrate || true
+            pod install --repo-update 2>&1
+            cd ..
+            if grep -qiE "RNFBApp|RNFBAuth|RNFBMessaging|FirebaseCore" ios/Podfile.lock 2>/dev/null; then
+              echo "FATAL: RNFB still in Podfile.lock after clean install"
+              exit 1
+            fi
+          fi
+          echo "OK: Podfile.lock is Firebase-free"
 
           NODE_BINARY="$(command -v node)"
           export NODE_BINARY
