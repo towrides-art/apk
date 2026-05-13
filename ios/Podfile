@@ -13,6 +13,24 @@ require Pod::Executable.execute_command('node', ['-p',
     {paths: [process.argv[1]]},
   )', __dir__]).strip
 
+BLOCKED_PODS = %w[
+  RNFBApp RNFBAuth RNFBMessaging RNFBStorage RNFBDatabase RNFBFirestore
+  RNFBAnalytics RNFBCrashlytics RNFBDynamicLinks RNFBFunctions RNFBInAppMessaging
+  RNFBPerf RNFBRemoteConfig RNFBMLKit
+  Firebase FirebaseCore FirebaseAuth FirebaseMessaging FirebaseAnalytics
+  FirebaseCrashlytics FirebaseDatabase FirebaseFirestore FirebaseStorage
+  FirebaseInstallations FirebaseRemoteConfig GoogleDataTransport
+  GoogleUtilities nanopb PromisesObjC AbseilCpp gRPC-C++ gRPC-Core
+].freeze
+
+pre_install do |installer|
+  installer.pod_targets.each do |pod|
+    if BLOCKED_PODS.any? { |b| pod.name.start_with?(b) }
+      raise "BLOCKED: Pod '#{pod.name}' is not allowed in this project."
+    end
+  end
+end
+
 platform :ios, '15.1'
 prepare_react_native_project!
 
