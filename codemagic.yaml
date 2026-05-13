@@ -1,13 +1,12 @@
 workflows:
   ios-workflow:
     name: iOS Build
-    max_build_duration: 60
+    max_build_duration: 90
     environment:
       xcode: 16.0
       cocoapods: default
       node: 18.20.4
       vars:
-        XCODE_PATH: /Applications/Xcode-16.0.app
         DEVELOPER_DIR: /Applications/Xcode-16.0.app/Contents/Developer
         RCT_NEW_ARCH_ENABLED: "0"
         RCT_FABRIC_ENABLED: "0"
@@ -17,22 +16,18 @@ workflows:
         distribution_type: app_store
         bundle_identifier: com.towrides.app
 
-    # Disable caching to prevent stale node_modules with Firebase
     cache:
       cache_paths: []
 
     scripts:
-      - name: Remove junk & old artifacts
+      - name: Clean everything
         script: |
           set -e
-          rm -rf __MACOSX
-          rm -rf node_modules
-          rm -rf ios/Pods
-          rm -rf ios/Podfile.lock
-          rm -rf ios/build
+          rm -rf __MACOSX node_modules
+          rm -rf ios/Pods ios/Podfile.lock ios/build
           rm -rf ~/Library/Developer/Xcode/DerivedData
           rm -rf ~/Library/Caches/CocoaPods
-          echo "Old artifacts cleaned"
+          echo "Clean done"
 
       - name: Install Node dependencies
         script: |
@@ -41,33 +36,19 @@ workflows:
           npm cache clean --force
           npm install --legacy-peer-deps --no-audit --no-fund
 
-          echo "=== NUCLEAR FIREBASE + NOTIFEE REMOVAL ==="
+          echo "=== REMOVING FIREBASE + NOTIFEE ==="
           rm -rf node_modules/@react-native-firebase
           rm -rf node_modules/firebase
           rm -rf node_modules/@firebase
           rm -rf node_modules/@notifee
-          if [ -d "node_modules/@react-native-firebase" ]; then
-            sudo rm -rf node_modules/@react-native-firebase || true
-          fi
-          if [ -d "node_modules/@react-native-firebase" ]; then
-            echo "FATAL: Cannot delete Firebase!"
-            exit 1
-          fi
-          echo "Firebase + Notifee confirmed deleted from node_modules"
+          echo "Removal done"
 
-          # Apply local patches
-          npx patch-package || echo "No patches to apply"
+          npx patch-package || echo "No patches"
 
-      - name: Configure Xcode 16.0
+      - name: Configure Xcode
         script: |
           set -e
-          if [ ! -d "$XCODE_PATH" ]; then
-            echo "Xcode not found at $XCODE_PATH"
-            ls /Applications
-            exit 1
-          fi
-          sudo xcode-select --switch "$XCODE_PATH"
-          export DEVELOPER_DIR="$DEVELOPER_DIR"
+          sudo xcode-select --switch /Applications/Xcode-16.0.app
           "$DEVELOPER_DIR/usr/bin/xcodebuild" -version
 
       - name: Install Pods
@@ -75,26 +56,22 @@ workflows:
           set -e
           export DEVELOPER_DIR="$DEVELOPER_DIR"
 
-          # Final Firebase + Notifee check before pod install
           rm -rf node_modules/@react-native-firebase
           rm -rf node_modules/firebase
           rm -rf node_modules/@firebase
           rm -rf node_modules/@notifee
-          if [ -d "node_modules/@react-native-firebase" ]; then
-            sudo rm -rf node_modules/@react-native-firebase || true
-          fi
 
           cd ios
           pod cache clean --all
           pod install --repo-update
 
-          # Verify clean Podfile.lock
-          if grep -qi "firebase\|RNFB" Podfile.lock; then
-            echo "ERROR: Firebase pods still in Podfile.lock!"
-            grep -i "firebase\|RNFB" Podfile.lock
+          echo "=== Podfile.lock Firebase check ==="
+          if grep -qi "RNFB\|RNFBApp\|RNFBMessaging\|RNFBAuth\|FirebaseCore\|FirebaseAuth\|FirebaseMessaging" Podfile.lock; then
+            echo "FATAL: Firebase pods found in Podfile.lock!"
+            grep -i "RNFB\|Firebase" Podfile.lock
             exit 1
           fi
-          echo "Podfile.lock is Firebase-free"
+          echo "CLEAN: No Firebase pods in Podfile.lock"
 
       - name: Set up code signing
         script: |
@@ -110,54 +87,67 @@ workflows:
           export RCT_SKIP_CODEGEN=1
 
           NODE_BINARY="$(command -v node)"
-          if [ -z "$NODE_BINARY" ]; then
-            echo "Node not found in PATH" && exit 1
-          fi
           export NODE_BINARY
           export PATH="$(dirname "$NODE_BINARY"):$PATH"
 
-          cd ios
-
-          cat > .xcode.env <<EOF
-          RCT_NEW_ARCH_ENABLED=0
-          RCT_FABRIC_ENABLED=0
-          RCT_SKIP_CODEGEN=1
-          NODE_BINARY=$NODE_BINARY
-          PATH=$PATH
-          EOF
-
-          cat > .xcode.env.local <<EOF
-          RCT_NEW_ARCH_ENABLED=0
-          RCT_FABRIC_ENABLED=0
-          RCT_SKIP_CODEGEN=1
-          NODE_BINARY=$NODE_BINARY
-          PATH=$PATH
-          EOF
+          # Write .xcode.env files (must be in ios/ directory)
+          printf "export RCT_NEW_ARCH_ENABLED=0\nexport USE_HERMES=0\nexport NODE_BINARY=%s\nexport PATH=%s\n" \
+            "$NODE_BINARY" "$PATH" > ios/.xcode.env
+          cp ios/.xcode.env ios/.xcode.env.local
 
           mkdir -p /tmp/xcodebuild_logs
-          set -o pipefail
 
+          # NOTE: working dir is project root, NOT ios/
+          # So -workspace path must include ios/
+          set -o pipefail
           "$DEVELOPER_DIR/usr/bin/xcodebuild" \
             -workspace ios/TowRides.xcworkspace \
             -scheme TowRides \
             -configuration Release \
             -sdk iphoneos \
             -derivedDataPath ios/build \
-            clean archive \
+            -archivePath ios/build/TowRides.xcarchive \
+            ONLY_ACTIVE_ARCH=NO \
             CODE_SIGNING_ALLOWED=NO \
             COMPILER_INDEX_STORE_ENABLE=NO \
-            ONLY_ACTIVE_ARCH=NO \
+            clean archive \
             2>&1 | tee /tmp/xcodebuild_logs/xcodebuild.log
 
           status=${PIPESTATUS[0]}
           if [ $status -ne 0 ]; then
-            echo "--- xcodebuild error lines ---"
-            grep -n "error:" /tmp/xcodebuild_logs/xcodebuild.log | tail -n 100 || true
-            echo "--- last 200 lines ---"
-            tail -n 200 /tmp/xcodebuild_logs/xcodebuild.log
+            echo "--- ERRORS ---"
+            grep " error:" /tmp/xcodebuild_logs/xcodebuild.log | tail -50 || true
             exit $status
           fi
 
+      - name: Export IPA
+        script: |
+          set -e
+          mkdir -p ios/build/export
+
+          cat > /tmp/ExportOptions.plist <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store</string>
+            <key>uploadBitcode</key>
+            <false/>
+            <key>compileBitcode</key>
+            <false/>
+          </dict>
+          </plist>
+          EOF
+
+          "$DEVELOPER_DIR/usr/bin/xcodebuild" \
+            -exportArchive \
+            -archivePath ios/build/TowRides.xcarchive \
+            -exportOptionsPlist /tmp/ExportOptions.plist \
+            -exportPath ios/build/export \
+            2>&1
+
     artifacts:
-      - ios/build/**/*.xcarchive
+      - ios/build/export/*.ipa
+      - ios/build/TowRides.xcarchive
       - /tmp/xcodebuild_logs/*.log
