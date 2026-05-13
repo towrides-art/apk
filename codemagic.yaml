@@ -34,27 +34,16 @@ workflows:
           set -e
           rm -f package-lock.json yarn.lock
           npm cache clean --force
+          npm install --legacy-peer-deps --no-audit --no-fund
 
-          # --ignore-scripts: postinstall nahi chalega during install
-          npm install --legacy-peer-deps --no-audit --no-fund --ignore-scripts
-
-          echo "=== NUCLEAR FIREBASE + NOTIFEE REMOVAL ==="
-          rm -rf node_modules/@react-native-firebase
-          rm -rf node_modules/firebase
-          rm -rf node_modules/@firebase
-          rm -rf node_modules/@notifee
-
-          # Verify deletion
+          echo "=== Verifying no Firebase in node_modules ==="
           for pkg in "@react-native-firebase" "firebase" "@firebase" "@notifee"; do
             if [ -d "node_modules/$pkg" ]; then
-              echo "FATAL: $pkg still exists after deletion!"
-              exit 1
+              echo "FATAL: $pkg found in node_modules - removing!"
+              rm -rf "node_modules/$pkg"
             fi
           done
-          echo "CONFIRMED: All Firebase/Notifee packages deleted"
-
-          # Now run patch-package manually (scripts were skipped above)
-          npx patch-package || echo "No patches"
+          echo "CONFIRMED: No Firebase packages in node_modules"
 
       - name: Configure Xcode
         script: |

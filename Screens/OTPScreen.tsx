@@ -5,7 +5,7 @@ import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../src/theme/ThemeProvider';
 import api from "./axiosInstance";
-import { sendOTP, confirmOTP, resetConfirmation } from '../src/utils/firebaseAuth';
+import { sendOTP, confirmOTP, resetConfirmation } from '../src/utils/otpService';
 
 export default function OTPScreen({navigation,route }:any ){
     const { theme } = useTheme();

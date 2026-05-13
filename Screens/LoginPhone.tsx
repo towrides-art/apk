@@ -6,7 +6,7 @@ import Toast from '../src/utils/toast';
 import { useTheme } from '../src/theme/ThemeProvider';
 import { StyledText, StyledButton, StyledView, Spacer } from '../src/components/styled';
 import { dimensions } from '../src/theme/dimensions';
-import { sendOTP } from '../src/utils/firebaseAuth';
+import { sendOTP } from '../src/utils/otpService';
 export default function LoginPhone({ navigation }: any) {
   const { theme } = useTheme();
   const [countryCode, setCountryCode] = useState('IN' as any);
