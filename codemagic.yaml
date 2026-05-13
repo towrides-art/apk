@@ -41,10 +41,11 @@ workflows:
           npm cache clean --force
           npm install --legacy-peer-deps --no-audit --no-fund
 
-          echo "=== NUCLEAR FIREBASE REMOVAL ==="
+          echo "=== NUCLEAR FIREBASE + NOTIFEE REMOVAL ==="
           rm -rf node_modules/@react-native-firebase
           rm -rf node_modules/firebase
           rm -rf node_modules/@firebase
+          rm -rf node_modules/@notifee
           if [ -d "node_modules/@react-native-firebase" ]; then
             sudo rm -rf node_modules/@react-native-firebase || true
           fi
@@ -52,7 +53,7 @@ workflows:
             echo "FATAL: Cannot delete Firebase!"
             exit 1
           fi
-          echo "Firebase confirmed deleted from node_modules"
+          echo "Firebase + Notifee confirmed deleted from node_modules"
 
           # Apply local patches
           npx patch-package || echo "No patches to apply"
@@ -74,10 +75,11 @@ workflows:
           set -e
           export DEVELOPER_DIR="$DEVELOPER_DIR"
 
-          # Final Firebase check before pod install
+          # Final Firebase + Notifee check before pod install
           rm -rf node_modules/@react-native-firebase
           rm -rf node_modules/firebase
           rm -rf node_modules/@firebase
+          rm -rf node_modules/@notifee
           if [ -d "node_modules/@react-native-firebase" ]; then
             sudo rm -rf node_modules/@react-native-firebase || true
           fi

@@ -1,5 +1,8 @@
 ENV['RCT_NEW_ARCH_ENABLED'] = '0'
 ENV['RCT_SKIP_CODEGEN'] = '1'
+
+require 'fileutils'
+
 node_binary = ENV['NODE_BINARY']
 if node_binary.nil? || node_binary.empty?
   node_binary = Pod::Executable.execute_command('which', ['node']).strip
@@ -12,42 +15,21 @@ require Pod::Executable.execute_command('node', ['-p',
     {paths: [process.argv[1]]},
   )', __dir__]).strip
 
+# Remove Firebase + notifee packages so autolinking never finds them
+['../node_modules/@react-native-firebase',
+ '../node_modules/firebase',
+ '../node_modules/@firebase',
+ '../node_modules/@notifee'].each do |pkg|
+  if File.exist?(pkg)
+    puts "PODFILE: Deleting #{pkg}"
+    FileUtils.rm_rf(pkg)
+  end
+end
+
 platform :ios, '15.1'
 prepare_react_native_project!
 
 use_frameworks! :linkage => :static
-
-# NUCLEAR: Delete ENTIRE @react-native-firebase directory BEFORE anything else runs
-# This ensures autolinking can't even find the packages
-require 'fileutils'
-firebase_root = '../node_modules/@react-native-firebase'
-if File.exist?(firebase_root)
-  puts "=" * 60
-  puts "PODFILE: DELETING ENTIRE @react-native-firebase FOLDER"
-  puts "=" * 60
-  FileUtils.rm_rf(firebase_root)
-  # Verify deletion
-  if File.exist?(firebase_root)
-    puts "FATAL: Could not delete @react-native-firebase!"
-    raise "Firebase folder could not be deleted"
-  else
-    puts "SUCCESS: @react-native-firebase completely removed"
-  end
-end
-# Also delete standalone firebase package
-firebase_standalone = '../node_modules/firebase'
-FileUtils.rm_rf(firebase_standalone) if File.exist?(firebase_standalone)
-
-# CRITICAL: Pre-install hook to remove Firebase pods from iOS
-pre_install do |installer|
-  puts "Filtering out Firebase pods from iOS build..."
-  installer.analysis_result.specifications.each do |spec|
-    if spec.name.start_with?('RNFB') || spec.name.start_with?('Firebase')
-      puts "Excluding pod: #{spec.name}"
-      spec.attributes_hash['platforms'] = { 'osx' => nil, 'ios' => nil, 'tvos' => nil, 'watchos' => nil }
-    end
-  end
-end
 
 target 'TowRides' do
   config = use_native_modules!
@@ -57,22 +39,11 @@ target 'TowRides' do
     :hermes_enabled => false,
     :fabric_enabled => false,
     :new_arch_enabled => false,
-    :production => true,
     :app_path => "#{Pod::Config.instance.installation_root}/..",
     :flipper_configuration => FlipperConfiguration.disabled
   )
 
   post_install do |installer|
-    # Remove Firebase targets to prevent iOS build failures
-    puts "Removing Firebase targets from Pods..."
-    installer.pods_project.targets.each do |target|
-      if target.name.start_with?('RNFB') || target.name.start_with?('Firebase')
-        puts "Deleting target: #{target.name}"
-        target.remove_from_project
-      end
-    end
-    installer.pods_project.save
-    
     react_native_post_install(
       installer,
       config[:reactNativePath],
@@ -80,127 +51,26 @@ target 'TowRides' do
     )
 
     installer.pods_project.targets.each do |target|
-      # Remove all Fabric-related targets to avoid hash_compile errors
-      if target.name.include?('React-Fabric') ||
-         target.name.include?('React-graphics') ||
-         target.name.include?('React-renderer') ||
-         target.name.include?('React-ImageManager') ||
-         target.name.include?('React-FabricImage') ||
-         target.name.include?('React-RCTFabric')
-        target.remove_from_project
-      end
-
-        if target.name == 'React-Codegen'
-        target.build_configurations.each do |config|
-          config.build_settings['NODE_BINARY'] = node_binary
-        end
-      end
-
-      target.build_configurations.each do |config|
-        # Basic build settings
-        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'
-        config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++20'
-        config.build_settings['CLANG_CXX_LIBRARY'] = 'libc++'
-        config.build_settings['GCC_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
-        config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
-        config.build_settings['CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER'] = 'NO'
-        config.build_settings['ENABLE_BITCODE'] = 'NO'
-        config.build_settings['ENABLE_USER_SCRIPT_SANDBOXING'] = 'NO'
-        
-        # Swift settings
-        config.build_settings['SWIFT_VERSION'] = '5.0'
-        config.build_settings['SWIFT_OPTIMIZATION_LEVEL'] = '-Onone'
-        config.build_settings['SWIFT_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
-        
-        # Framework and Swift support for Xcode 16
-        config.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'NO'
-        config.build_settings['DEFINES_MODULE'] = 'YES'
-        config.build_settings['LD_RUNPATH_SEARCH_PATHS'] = '$(inherited) @executable_path/Frameworks @loader_path/Frameworks'
-        
-        # Remove problematic preprocessor definitions
-        preprocessor_defs = Array(config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'])
-        preprocessor_defs << '$(inherited)' if preprocessor_defs.empty?
-        preprocessor_defs.reject! { |definition| definition.to_s.start_with?('RCT_NEW_ARCH_ENABLED') }
-        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] = preprocessor_defs
-        
-        # Disable ALL warnings as errors globally
-        config.build_settings['GCC_WARN_INHIBIT_ALL_WARNINGS'] = 'YES'
-        config.build_settings['CLANG_WARN_SUSPICIOUS_IMPLICIT_CONVERSION'] = 'NO'
-        config.build_settings['CLANG_MODULES_AUTOLINK'] = 'NO'
-        
-        # Add Swift library paths for all targets
-        config.build_settings['LIBRARY_SEARCH_PATHS'] = '$(inherited) $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(SDKROOT)/usr/lib/swift'
-        
-        # Aggressive warning suppression for all targets - COMPLETELY REPLACE OTHER_CFLAGS
-        # This is necessary because $(inherited) brings in -Werror flags
-        other_cflags = ['-w']  # Start fresh with -w (suppress all warnings)
-        other_cflags << '-Wno-error'
-        other_cflags << '-Wno-error=non-modular-include-in-framework-module'
-        other_cflags << '-Wno-error=deprecated-objc-isa-usage'
-        other_cflags << '-Wno-error=return-type'
-        other_cflags << '-Wno-error=implicit-function-declaration'
-        other_cflags << '-Wno-error=objc-method-access'
-        other_cflags << '-Wno-error=incompatible-pointer-types'
-        other_cflags << '-Wno-error=incompatible-function-pointer-types'
-        other_cflags << '-Wno-error=protocol'
-        other_cflags << '-Wno-error=deprecated-declarations'
-        other_cflags << '-Wno-error=objc-root-class'
-        other_cflags << '-Wno-error=objc-protocol-method-usage'
-        other_cflags << '-Wno-error=strict-prototypes'
-        other_cflags << '-Wno-error=documentation'
-        other_cflags << '-Wno-error=unreachable-code'
-        other_cflags << '-Wno-error=implicit-retain-self'
-        other_cflags << '-Wno-error=duplicate-method-match'
-        other_cflags << '-Wno-error=unused-function'
-        other_cflags << '-Wno-error=unused-variable'
-        other_cflags << '-Wno-error=empty-body'
-        other_cflags << '-Wno-error=uninitialized'
-        other_cflags << '-Wno-error=shadow'
-        other_cflags << '-Wno-error=conversion'
-        other_cflags << '-Wno-error=constant-conversion'
-        other_cflags << '-Wno-error=int-conversion'
-        other_cflags << '-Wno-error=bool-conversion'
-        other_cflags << '-Wno-error=enum-conversion'
-        other_cflags << '-Wno-error=shorten-64-to-32'
-        other_cflags << '-Wno-error=pointer-sign'
-        other_cflags << '-Wno-error=undeclared-selector'
-        other_cflags << '-Wno-error=deprecated-implementations'
-        other_cflags << '-Wno-error=protocol'
-        other_cflags << '-Wno-error=sign-conversion'
-        other_cflags << '-Wno-error=infinite-recursion'
-        other_cflags << '-Wno-error=comma'
-        other_cflags << '-Wno-error=block-capture-autoreleasing'
-        other_cflags << '-Wno-error=unguarded-availability'
-        config.build_settings['OTHER_CFLAGS'] = other_cflags
-        
-        # Swift compiler flags - suppress warnings
-        other_swift_flags = Array(config.build_settings['OTHER_SWIFT_FLAGS'])
-        other_swift_flags << '$(inherited)' if other_swift_flags.empty?
-        other_swift_flags << '-suppress-warnings'
-        other_swift_flags << '-no-warnings-as-errors'
-        config.build_settings['OTHER_SWIFT_FLAGS'] = other_swift_flags
-        
-        # Linker flags
-        other_ldflags = Array(config.build_settings['OTHER_LDFLAGS'])
-        other_ldflags << '$(inherited)' if other_ldflags.empty?
-        other_ldflags << '-ObjC'
-        other_ldflags << '-all_load'
-        config.build_settings['OTHER_LDFLAGS'] = other_ldflags
-        # Fix for react-native-permissions to avoid build issues
-        if target.name.include?('RNPermissions')
-          config.build_settings['OTHER_CFLAGS'] = ['-w', '-Wno-error']
-          config.build_settings['GCC_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
-        end
-        
-        # Fix for react-native-safe-area-context
-        if target.name.include?('safe-area-context')
-          config.build_settings['OTHER_CFLAGS'] = ['-w', '-Wno-error']
-          config.build_settings['GCC_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
-        end
-        
-        
+      target.build_configurations.each do |cfg|
+        cfg.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'
+        cfg.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++20'
+        cfg.build_settings['CLANG_CXX_LIBRARY'] = 'libc++'
+        cfg.build_settings['GCC_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
+        cfg.build_settings['SWIFT_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
+        cfg.build_settings['ENABLE_BITCODE'] = 'NO'
+        cfg.build_settings['ENABLE_USER_SCRIPT_SANDBOXING'] = 'NO'
+        cfg.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+        cfg.build_settings['CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER'] = 'NO'
+        cfg.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'NO'
+        cfg.build_settings['SWIFT_VERSION'] = '5.0'
+        cfg.build_settings['SWIFT_OPTIMIZATION_LEVEL'] = '-Onone'
+        cfg.build_settings['OTHER_CFLAGS'] = ['$(inherited)', '-w', '-Wno-error']
+        cfg.build_settings['OTHER_SWIFT_FLAGS'] = ['$(inherited)', '-suppress-warnings']
+        cfg.build_settings['GCC_WARN_INHIBIT_ALL_WARNINGS'] = 'YES'
+        defs = Array(cfg.build_settings['GCC_PREPROCESSOR_DEFINITIONS'])
+        defs.reject! { |d| d.to_s.include?('RCT_NEW_ARCH_ENABLED') }
+        cfg.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] = defs.empty? ? ['$(inherited)'] : defs
       end
     end
-    
   end
 end

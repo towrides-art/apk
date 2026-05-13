@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { View, Text, Button, StyleSheet, Platform, PermissionsAndroid } from 'react-native';
+import { View, Text, Button, StyleSheet, Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
@@ -29,7 +29,6 @@ import TrackingScreen from './Screens/Tracking/TrackingScreen';
 import PaymentScreen from './Screens/PaymentPage'
 import SplashVideo from './Screens/VideoSplash';
 import DriverSupport from './Screens/Support';
-import notifee, { AndroidImportance } from '@notifee/react-native';
 
 const Stack = createNativeStackNavigator();
 
@@ -61,29 +60,6 @@ const AppContent: React.FC = () => {
         setDefaultScreen('PreLogin');
       }
     };
-    
-      // 1️⃣ Ask permission (Android 13+)
-  const requestAndroidPermission = async () => {
-    if (Platform.OS === 'android' && Platform.Version >= 33) {
-      const permission = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
-      );
-
-      console.log("Notification Permission:", permission);
-    }
-  };
-
-  // 2️⃣ Create Notification Channel (Android)
-  const createChannel = async () => {
-    await notifee.createChannel({
-      id: 'default',
-      name: 'Default',
-      importance: AndroidImportance.HIGH,
-    });
-  };
-
-  requestAndroidPermission();
-    createChannel();
     initializeApp();
      
     
