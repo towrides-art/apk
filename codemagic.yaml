@@ -12,7 +12,7 @@ workflows:
         RCT_FABRIC_ENABLED: "0"
         USE_HERMES: "0"
         RCT_SKIP_CODEGEN: "1"
-        FORCE_CLEAN_BUILD: "20260513-v4"
+        FORCE_CLEAN_BUILD: "20260513-v5"
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.towrides.app
@@ -60,15 +60,35 @@ workflows:
           set -e
           export DEVELOPER_DIR="$DEVELOPER_DIR"
 
-          # Hard delete before pod install so autolinking never sees them
+          # Nuclear delete BEFORE pod install
           rm -rf node_modules/@react-native-firebase
           rm -rf node_modules/firebase
           rm -rf node_modules/@firebase
           rm -rf node_modules/@notifee
+          echo "Firebase packages deleted from node_modules"
 
           cd ios
+          pod deintegrate || true
+          rm -rf Pods Podfile.lock build
           pod cache clean --all
           pod install --repo-update 2>&1
+
+          # Remove [CP-User] [RNFB] Core Configuration build phase from xcodeproj
+          ruby - <<'RUBY'
+          require 'xcodeproj'
+          path = 'TowRides.xcodeproj'
+          project = Xcodeproj::Project.open(path)
+          project.targets.each do |target|
+            target.build_phases.delete_if do |phase|
+              name = phase.respond_to?(:name) ? phase.name.to_s : ''
+              remove = name.include?('RNFB') || name.include?('firebase') || name.include?('Firebase')
+              puts "Removing build phase: #{name}" if remove
+              remove
+            end
+          end
+          project.save
+          puts 'xcodeproj saved'
+          RUBY
 
           # Verify no RNFB pods were installed
           if grep -qiE "RNFBApp|RNFBAuth|RNFBMessaging|FirebaseCore|FirebaseAuth|FirebaseMessaging" Podfile.lock 2>/dev/null; then
@@ -76,7 +96,7 @@ workflows:
             grep -iE "RNFB|Firebase" Podfile.lock
             exit 1
           fi
-          echo "OK: No Firebase pods installed"
+          echo "OK: No Firebase pods in Podfile.lock"
           grep -E "^  - " Podfile.lock | head -60
 
       - name: Set up code signing
