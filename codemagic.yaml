@@ -12,7 +12,7 @@ workflows:
         RCT_FABRIC_ENABLED: "0"
         USE_HERMES: "0"
         RCT_SKIP_CODEGEN: "1"
-        FORCE_CLEAN_BUILD: "20260513-v3"
+        FORCE_CLEAN_BUILD: "20260513-v4"
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.towrides.app
@@ -37,7 +37,17 @@ workflows:
           npm cache clean --force
           npm install --legacy-peer-deps --no-audit --no-fund
 
-          echo "node_modules installed successfully"
+          echo "=== Deleting Firebase packages ==="
+          rm -rf node_modules/@react-native-firebase
+          rm -rf node_modules/firebase
+          rm -rf node_modules/@firebase
+          rm -rf node_modules/@notifee
+
+          if [ -d "node_modules/@react-native-firebase" ]; then
+            echo "ERROR: @react-native-firebase still exists!"
+            exit 1
+          fi
+          echo "OK: No Firebase in node_modules"
 
       - name: Configure Xcode
         script: |
@@ -50,10 +60,23 @@ workflows:
           set -e
           export DEVELOPER_DIR="$DEVELOPER_DIR"
 
+          # Hard delete before pod install so autolinking never sees them
+          rm -rf node_modules/@react-native-firebase
+          rm -rf node_modules/firebase
+          rm -rf node_modules/@firebase
+          rm -rf node_modules/@notifee
+
           cd ios
           pod cache clean --all
           pod install --repo-update 2>&1
-          echo "=== Installed pods ==="
+
+          # Verify no RNFB pods were installed
+          if grep -qiE "RNFBApp|RNFBAuth|RNFBMessaging|FirebaseCore|FirebaseAuth|FirebaseMessaging" Podfile.lock 2>/dev/null; then
+            echo "ERROR: Firebase pods found in Podfile.lock!"
+            grep -iE "RNFB|Firebase" Podfile.lock
+            exit 1
+          fi
+          echo "OK: No Firebase pods installed"
           grep -E "^  - " Podfile.lock | head -60
 
       - name: Set up code signing
