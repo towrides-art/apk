@@ -51,7 +51,7 @@ const user_details={
       await sendOTP(fullPhone);
       Toast.show('Verification code sent successfully');  
     } catch (err: any) {
-      console.log("Firebase Error:", err.message);
+      console.log("OTP Error:", err.message);
       Toast.show("Failed to send OTP. Please try again.");
     }
     }

@@ -1,8 +1,6 @@
 ENV['RCT_NEW_ARCH_ENABLED'] = '0'
 ENV['RCT_SKIP_CODEGEN'] = '1'
 
-require 'fileutils'
-
 node_binary = ENV['NODE_BINARY']
 if node_binary.nil? || node_binary.empty?
   node_binary = Pod::Executable.execute_command('which', ['node']).strip
@@ -14,17 +12,6 @@ require Pod::Executable.execute_command('node', ['-p',
     "react-native/scripts/react_native_pods.rb",
     {paths: [process.argv[1]]},
   )', __dir__]).strip
-
-# Remove Firebase + notifee packages so autolinking never finds them
-['../node_modules/@react-native-firebase',
- '../node_modules/firebase',
- '../node_modules/@firebase',
- '../node_modules/@notifee'].each do |pkg|
-  if File.exist?(pkg)
-    puts "PODFILE: Deleting #{pkg}"
-    FileUtils.rm_rf(pkg)
-  end
-end
 
 platform :ios, '15.1'
 prepare_react_native_project!

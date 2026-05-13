@@ -37,14 +37,7 @@ workflows:
           npm cache clean --force
           npm install --legacy-peer-deps --no-audit --no-fund
 
-          echo "=== Verifying no Firebase in node_modules ==="
-          for pkg in "@react-native-firebase" "firebase" "@firebase" "@notifee"; do
-            if [ -d "node_modules/$pkg" ]; then
-              echo "FATAL: $pkg found in node_modules - removing!"
-              rm -rf "node_modules/$pkg"
-            fi
-          done
-          echo "CONFIRMED: No Firebase packages in node_modules"
+          echo "node_modules installed successfully"
 
       - name: Configure Xcode
         script: |
@@ -57,24 +50,10 @@ workflows:
           set -e
           export DEVELOPER_DIR="$DEVELOPER_DIR"
 
-          # Re-confirm Firebase gone before pod install
-          rm -rf node_modules/@react-native-firebase node_modules/firebase node_modules/@firebase node_modules/@notifee
-          echo "Pre-pod Firebase check:"
-          ls node_modules | grep -i firebase || echo "  -> No firebase in node_modules"
-          ls node_modules | grep -i notifee || echo "  -> No notifee in node_modules"
-
           cd ios
           pod cache clean --all
           pod install --repo-update 2>&1
-
-          echo "=== Podfile.lock Firebase check ==="
-          if grep -qi "RNFB\|FirebaseCore\|FirebaseAuth\|FirebaseMessaging\|GoogleDataTransport\|FirebaseInstallations" Podfile.lock; then
-            echo "FATAL: Firebase pods found in Podfile.lock!"
-            grep -i "RNFB\|Firebase\|GoogleData" Podfile.lock
-            exit 1
-          fi
-          echo "CLEAN: No Firebase pods in Podfile.lock"
-          echo "=== All installed pods ==="
+          echo "=== Installed pods ==="
           grep -E "^  - " Podfile.lock | head -60
 
       - name: Set up code signing

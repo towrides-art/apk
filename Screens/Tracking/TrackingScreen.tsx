@@ -213,7 +213,6 @@ export default function TrackingScreen({ navigation, route }: any) {
     }
   };
 
-  // Start location polling (replaces Firebase Realtime DB)
   const startLocationPolling = () => {
     if (!bookingId) return;
 
