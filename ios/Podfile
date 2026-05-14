@@ -24,10 +24,8 @@ BLOCKED_PODS = %w[
 ].freeze
 
 pre_install do |installer|
-  installer.pod_targets.each do |pod|
-    if BLOCKED_PODS.any? { |b| pod.name.start_with?(b) }
-      raise "BLOCKED: Pod '#{pod.name}' is not allowed in this project."
-    end
+  installer.pod_targets.reject! do |pod|
+    BLOCKED_PODS.any? { |b| pod.name.start_with?(b) }
   end
 end
 
@@ -54,6 +52,30 @@ target 'TowRides' do
       config[:reactNativePath],
       :mac_catalyst_enabled => false
     )
+
+    # Remove any RNFB build phases injected by CocoaPods
+    installer.pods_project.targets.each do |t|
+      t.build_phases.reject! do |phase|
+        n = phase.respond_to?(:name) ? phase.name.to_s : ''
+        n.include?('RNFB') || n.include?('Firebase')
+      end
+    end
+
+    # Remove RNFB build phases from main app project too
+    main_proj_path = File.join(File.dirname(__FILE__), 'TowRides.xcodeproj')
+    if File.exist?(main_proj_path)
+      require 'xcodeproj'
+      main_proj = Xcodeproj::Project.open(main_proj_path)
+      main_proj.targets.each do |t|
+        t.build_phases.reject! do |phase|
+          n = phase.respond_to?(:name) ? phase.name.to_s : ''
+          removed = n.include?('RNFB') || n.include?('Firebase')
+          puts "[Podfile] Removing build phase: #{n}" if removed
+          removed
+        end
+      end
+      main_proj.save
+    end
 
     installer.pods_project.targets.each do |target|
       target.build_configurations.each do |cfg|

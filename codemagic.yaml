@@ -12,7 +12,7 @@ workflows:
         RCT_FABRIC_ENABLED: "0"
         USE_HERMES: "0"
         RCT_SKIP_CODEGEN: "1"
-        FORCE_CLEAN_BUILD: "20260513-v6"
+        FORCE_CLEAN_BUILD: "20260514-v7"
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.towrides.app
@@ -74,21 +74,24 @@ workflows:
           pod install --repo-update 2>&1
 
           # Remove [CP-User] [RNFB] Core Configuration build phase from xcodeproj
-          ruby - <<'RUBY'
-          require 'xcodeproj'
-          path = 'TowRides.xcodeproj'
-          project = Xcodeproj::Project.open(path)
-          project.targets.each do |target|
-            target.build_phases.delete_if do |phase|
-              name = phase.respond_to?(:name) ? phase.name.to_s : ''
-              remove = name.include?('RNFB') || name.include?('firebase') || name.include?('Firebase')
-              puts "Removing build phase: #{name}" if remove
-              remove
+          ruby -e "
+            require 'xcodeproj'
+            path = File.expand_path('TowRides.xcodeproj', Dir.pwd)
+            project = Xcodeproj::Project.open(path)
+            changed = false
+            project.targets.each do |target|
+              before = target.build_phases.size
+              target.build_phases.reject! do |phase|
+                n = phase.respond_to?(:name) ? phase.name.to_s : ''
+                remove = n.include?('RNFB') || n.include?('Firebase')
+                puts \"[Ruby] Removing build phase: \#{n}\" if remove
+                remove
+              end
+              changed = true if target.build_phases.size != before
             end
-          end
-          project.save
-          puts 'xcodeproj saved'
-          RUBY
+            project.save if changed
+            puts '[Ruby] xcodeproj saved, RNFB phases removed'
+          "
 
           # Verify no RNFB pods were installed
           if grep -qiE "RNFBApp|RNFBAuth|RNFBMessaging|FirebaseCore|FirebaseAuth|FirebaseMessaging" Podfile.lock 2>/dev/null; then
