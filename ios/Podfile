@@ -65,6 +65,65 @@ target 'TowRides' do
       :mac_catalyst_enabled => false
     )
 
+    # ── NUCLEAR: Remove ALL Firebase/RNFB targets from Pods.xcodeproj ──
+    firebase_pattern = /\A(RNFB|Firebase|GoogleUtilities|GoogleDataTransport|GTMSessionFetcher|FBLPromises|PromisesObjC|nanopb|RecaptchaInterop|Notifee)/i
+    removed_targets = []
+    installer.pods_project.targets.to_a.each do |target|
+      if target.name =~ firebase_pattern
+        removed_targets << target.name
+        target.remove_from_project
+      end
+    end
+    unless removed_targets.empty?
+      puts "[PODFILE-NUCLEAR] Removed #{removed_targets.length} Firebase/RNFB targets: #{removed_targets.join(', ')}"
+    end
+
+    # ── Remove [CP-User] [RNFB] Core Configuration from main app ──
+    main_project_path = File.join(__dir__, 'TowRides.xcodeproj')
+    if File.exist?(main_project_path)
+      require 'xcodeproj'
+      app_proj = Xcodeproj::Project.open(main_project_path)
+      app_proj.targets.each do |t|
+        t.build_phases.to_a.each do |bp|
+          if bp.respond_to?(:name) && bp.name.to_s =~ /RNFB|Firebase/i
+            puts "[PODFILE-NUCLEAR] Removing build phase: #{bp.name}"
+            bp.remove_from_project
+          end
+        end
+      end
+      app_proj.save
+    end
+
+    # ── Delete Firebase/RNFB pod source folders ──
+    pods_dir = installer.sandbox.root
+    %w[RNFBApp RNFBAuth RNFBMessaging Firebase FirebaseCore FirebaseAuth
+       FirebaseMessaging FirebaseCoreInternal FirebaseInstallations
+       FirebaseCoreExtension FirebaseAppCheckInterop FirebaseAuthInterop
+       GoogleUtilities GoogleDataTransport GTMSessionFetcher FBLPromises
+       PromisesObjC nanopb RecaptchaInterop].each do |pod_name|
+      pod_path = pods_dir + pod_name
+      if pod_path.exist?
+        FileUtils.rm_rf(pod_path)
+        puts "[PODFILE-NUCLEAR] Deleted pod folder: #{pod_name}"
+      end
+      tsf = pods_dir + 'Target Support Files' + pod_name
+      FileUtils.rm_rf(tsf) if tsf.exist?
+    end
+    # Delete RNFB/Firebase headers
+    ['Public', 'Private'].each do |vis|
+      headers_dir = pods_dir + 'Headers' + vis
+      next unless headers_dir.exist?
+      headers_dir.children.each do |child|
+        if child.basename.to_s =~ firebase_pattern
+          FileUtils.rm_rf(child)
+          puts "[PODFILE-NUCLEAR] Deleted headers: #{child.basename}"
+        end
+      end
+    end
+
+    installer.pods_project.save
+
+    # ── Standard build settings ──
     installer.pods_project.targets.each do |target|
       target.build_configurations.each do |cfg|
         cfg.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'
