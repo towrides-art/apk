@@ -18,6 +18,26 @@ prepare_react_native_project!
 
 use_frameworks! :linkage => :static
 
+BLOCKED_PODS = %w[
+  RNFBApp RNFBAuth RNFBMessaging
+  Firebase FirebaseCore FirebaseAuth FirebaseMessaging
+  FirebaseCoreInternal FirebaseInstallations FirebaseCoreExtension
+  FirebaseAppCheckInterop FirebaseAuthInterop
+  GoogleUtilities GoogleDataTransport
+  GTMSessionFetcher FBLPromises PromisesObjC
+  nanopb RecaptchaInterop NotifeeCore RNNotifee
+]
+
+pre_install do |installer|
+  installer.pod_targets.each do |pod|
+    if BLOCKED_PODS.any? { |blocked| pod.name.start_with?(blocked) }
+      puts "[BLOCKED] Removing pod: #{pod.name}"
+      pod.specs.each { |s| s.dependencies.clear }
+      pod.instance_variable_set(:@should_build, false)
+    end
+  end
+end
+
 target 'TowRides' do
   config = use_native_modules!
 

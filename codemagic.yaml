@@ -30,6 +30,10 @@ workflows:
           rm -rf node_modules
           npm install --legacy-peer-deps
           npx patch-package
+          echo "--- Removing RNFB from node_modules ---"
+          rm -rf node_modules/@react-native-firebase node_modules/@notifee node_modules/firebase node_modules/@firebase
+          echo "--- Verify RNFB gone ---"
+          ls node_modules/@react-native-firebase 2>/dev/null && echo "FAIL: RNFB still exists" && exit 1 || echo "OK: RNFB removed"
 
       - name: Use Xcode 16.0
         script: |
@@ -53,12 +57,22 @@ workflows:
 
           npm install --legacy-peer-deps
           npx patch-package
+          echo "--- Removing RNFB from node_modules ---"
+          rm -rf node_modules/@react-native-firebase node_modules/@notifee node_modules/firebase node_modules/@firebase
 
           cd ios
           pod deintegrate
           pod cache clean --all
           pod repo update
           pod install --repo-update
+
+          echo "--- Verify no RNFB pods ---"
+          if grep -r 'RNFBApp\|RNFBMessaging\|RNFBAuth' Pods/Target\ Support\ Files/ 2>/dev/null; then
+            echo "FAIL: RNFB pods found after pod install"
+            exit 1
+          else
+            echo "OK: Zero RNFB pods"
+          fi
 
       - name: Set up code signing
         script: |
@@ -96,10 +110,21 @@ workflows:
           PATH=$PATH
           EOF
 
+          echo "--- Removing RNFB from node_modules (pre-pod) ---"
+          rm -rf ../node_modules/@react-native-firebase ../node_modules/@notifee ../node_modules/firebase ../node_modules/@firebase
+
           pod deintegrate
           rm -rf Pods Podfile.lock build generated
 
           pod install --repo-update
+
+          echo "--- Final RNFB check in Pods ---"
+          if grep -r 'RNFBApp\|RNFBMessaging\|RNFBAuth' Pods/Target\ Support\ Files/ 2>/dev/null; then
+            echo "FAIL: RNFB pods STILL found - aborting build"
+            exit 1
+          else
+            echo "OK: Zero RNFB pods - safe to build"
+          fi
 
           cd ..
 
