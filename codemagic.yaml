@@ -118,13 +118,64 @@ workflows:
 
           pod install --repo-update
 
-          echo "--- Final RNFB check in Pods ---"
-          if grep -r 'RNFBApp\|RNFBMessaging\|RNFBAuth' Pods/Target\ Support\ Files/ 2>/dev/null; then
-            echo "FAIL: RNFB pods STILL found - aborting build"
+          echo "=== NUCLEAR RNFB REMOVAL FROM PODS ==="
+
+          rm -rf Pods/RNFBApp Pods/RNFBAuth Pods/RNFBMessaging
+          rm -rf Pods/Firebase Pods/FirebaseCore Pods/FirebaseAuth Pods/FirebaseMessaging
+          rm -rf Pods/FirebaseCoreInternal Pods/FirebaseInstallations Pods/FirebaseCoreExtension
+          rm -rf Pods/FirebaseAppCheckInterop Pods/FirebaseAuthInterop
+          rm -rf Pods/GoogleUtilities Pods/GoogleDataTransport
+          rm -rf Pods/GTMSessionFetcher Pods/FBLPromises Pods/PromisesObjC
+          rm -rf Pods/nanopb Pods/RecaptchaInterop
+          rm -rf "Pods/Target Support Files/RNFBApp"
+          rm -rf "Pods/Target Support Files/RNFBAuth"
+          rm -rf "Pods/Target Support Files/RNFBMessaging"
+          rm -rf "Pods/Target Support Files/Firebase"
+          rm -rf "Pods/Target Support Files/FirebaseCore"
+          rm -rf "Pods/Target Support Files/FirebaseAuth"
+          rm -rf "Pods/Target Support Files/FirebaseMessaging"
+          rm -rf "Pods/Target Support Files/FirebaseCoreInternal"
+          rm -rf "Pods/Target Support Files/FirebaseInstallations"
+          rm -rf "Pods/Target Support Files/FirebaseCoreExtension"
+          rm -rf "Pods/Target Support Files/GoogleUtilities"
+          rm -rf Pods/Headers/Public/RNFBApp Pods/Headers/Public/RNFBMessaging Pods/Headers/Public/RNFBAuth
+          rm -rf Pods/Headers/Public/Firebase* Pods/Headers/Public/GoogleUtilities
+          rm -rf Pods/Headers/Private/RNFBApp Pods/Headers/Private/RNFBMessaging Pods/Headers/Private/RNFBAuth
+
+          echo "=== REMOVING RNFB FROM PODS XCODEPROJ ==="
+          ruby <<'RUBY'
+          require 'xcodeproj'
+
+          pods_proj = Xcodeproj::Project.open('Pods/Pods.xcodeproj')
+          removed = []
+          pods_proj.targets.each do |t|
+            if t.name =~ /RNFB|Firebase|GoogleUtilities|GoogleDataTransport|GTMSessionFetcher|FBLPromises|PromisesObjC|nanopb|RecaptchaInterop/
+              removed << t.name
+              t.remove_from_project
+            end
+          end
+          pods_proj.save
+          puts "Removed pod targets: #{removed.join(', ')}"
+
+          app_proj = Xcodeproj::Project.open('../TowRides.xcodeproj')
+          app_proj.targets.each do |t|
+            t.build_phases.each do |bp|
+              if bp.respond_to?(:name) && bp.name.to_s.include?('RNFB')
+                puts "Removing build phase: #{bp.name}"
+                bp.remove_from_project
+              end
+            end
+          end
+          app_proj.save
+          puts "Done cleaning xcodeproj files"
+          RUBY
+
+          echo "=== FINAL VERIFY ==="
+          if ls Pods/Target\ Support\ Files/RNFB* 2>/dev/null || ls Pods/Target\ Support\ Files/Firebase* 2>/dev/null; then
+            echo "FAIL: RNFB/Firebase still in Pods"
             exit 1
-          else
-            echo "OK: Zero RNFB pods - safe to build"
           fi
+          echo "OK: ZERO RNFB in Pods - safe to build"
 
           cd ..
 
