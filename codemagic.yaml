@@ -1,60 +1,66 @@
 workflows:
   ios-workflow:
     name: iOS Build
-    max_build_duration: 90
+
+    max_build_duration: 60
+
     environment:
       xcode: 16.0
       cocoapods: default
       node: 18.20.4
+
       vars:
+        XCODE_PATH: /Applications/Xcode-16.0.app
         DEVELOPER_DIR: /Applications/Xcode-16.0.app/Contents/Developer
         RCT_NEW_ARCH_ENABLED: "0"
         RCT_FABRIC_ENABLED: "0"
         USE_HERMES: "0"
-        RCT_SKIP_CODEGEN: "1"
-        FORCE_CLEAN_BUILD: "20260514-v7"
+
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.towrides.app
 
-    cache:
-      cache_paths: []
-
     scripts:
-      - name: Clean everything
+      - name: Remove junk files
         script: |
-          set -e
-          rm -rf __MACOSX node_modules
-          rm -rf ios/Pods ios/Podfile.lock ios/build
-          rm -rf ~/Library/Developer/Xcode/DerivedData
-          rm -rf ~/Library/Caches/CocoaPods
-          echo "Clean done"
+          rm -rf __MACOSX
 
-      - name: Install Node dependencies
+      - name: Install dependencies
         script: |
-          set -e
-          rm -f package-lock.json yarn.lock
-          npm cache clean --force
-          npm install --legacy-peer-deps --no-audit --no-fund
+          rm -rf node_modules
+          npm install --legacy-peer-deps
+          rm -rf node_modules/@react-native-firebase node_modules/@notifee node_modules/firebase node_modules/@firebase
+          npx patch-package
 
-      - name: Configure Xcode
+      - name: Use Xcode 16.0
         script: |
-          set -e
-          sudo xcode-select --switch /Applications/Xcode-16.0.app
+          if [ ! -d "$XCODE_PATH" ]; then
+            echo "Xcode not found at $XCODE_PATH" && ls /Applications && exit 1
+          fi
+          sudo xcode-select --switch "$XCODE_PATH"
+          export DEVELOPER_DIR="$DEVELOPER_DIR"
           "$DEVELOPER_DIR/usr/bin/xcodebuild" -version
 
-      - name: Install Pods
+      - name: Clean Pods
         script: |
-          set -e
           export DEVELOPER_DIR="$DEVELOPER_DIR"
+          rm -rf ~/Library/Developer/Xcode/DerivedData
+          rm -rf ~/Library/Caches/CocoaPods
+          rm -rf ios/build
+          rm -rf ios/build/generated
+          rm -rf ios/Pods
+          rm -rf ios/Podfile.lock
+          rm -rf node_modules
+
+          npm install --legacy-peer-deps
+          rm -rf node_modules/@react-native-firebase node_modules/@notifee node_modules/firebase node_modules/@firebase
+          npx patch-package
 
           cd ios
-          pod deintegrate || true
-          rm -rf Pods Podfile.lock build
+          pod deintegrate
           pod cache clean --all
-          pod install --repo-update 2>&1
-
-          grep -E "^  - " Podfile.lock | head -60
+          pod repo update
+          pod install --repo-update
 
       - name: Set up code signing
         script: |
@@ -62,77 +68,67 @@ workflows:
 
       - name: Build IPA
         script: |
-          set -e
           export DEVELOPER_DIR="$DEVELOPER_DIR"
           export RCT_NEW_ARCH_ENABLED=0
           export RCT_FABRIC_ENABLED=0
           export USE_HERMES=0
           export RCT_SKIP_CODEGEN=1
-
           NODE_BINARY="$(command -v node)"
+          if [ -z "$NODE_BINARY" ]; then
+            echo "Node not found in PATH" && exit 1
+          fi
           export NODE_BINARY
           export PATH="$(dirname "$NODE_BINARY"):$PATH"
 
-          # Write .xcode.env files (must be in ios/ directory)
-          printf "export RCT_NEW_ARCH_ENABLED=0\nexport USE_HERMES=0\nexport NODE_BINARY=%s\nexport PATH=%s\n" \
-            "$NODE_BINARY" "$PATH" > ios/.xcode.env
-          cp ios/.xcode.env ios/.xcode.env.local
+          rm -rf node_modules/@react-native-firebase node_modules/@notifee node_modules/firebase node_modules/@firebase
+
+          cd ios
+
+          cat <<EOF > .xcode.env
+          RCT_NEW_ARCH_ENABLED=0
+          RCT_FABRIC_ENABLED=0
+          RCT_SKIP_CODEGEN=1
+          NODE_BINARY=$NODE_BINARY
+          PATH=$PATH
+          EOF
+
+          cat <<EOF > .xcode.env.local
+          RCT_NEW_ARCH_ENABLED=0
+          RCT_FABRIC_ENABLED=0
+          RCT_SKIP_CODEGEN=1
+          NODE_BINARY=$NODE_BINARY
+          PATH=$PATH
+          EOF
+
+          pod deintegrate
+          rm -rf Pods Podfile.lock build generated
+
+          pod install --repo-update
+
+          cd ..
 
           mkdir -p /tmp/xcodebuild_logs
-
-          # Nuke DerivedData to prevent stale build artifacts
-          rm -rf ~/Library/Developer/Xcode/DerivedData
-          rm -rf ios/build
-
           set -o pipefail
+
           "$DEVELOPER_DIR/usr/bin/xcodebuild" \
             -workspace ios/TowRides.xcworkspace \
             -scheme TowRides \
             -configuration Release \
             -sdk iphoneos \
             -derivedDataPath ios/build \
-            -archivePath ios/build/TowRides.xcarchive \
-            ONLY_ACTIVE_ARCH=NO \
-            CODE_SIGNING_ALLOWED=NO \
-            COMPILER_INDEX_STORE_ENABLE=NO \
             clean archive \
+            CODE_SIGNING_ALLOWED=NO \
             2>&1 | tee /tmp/xcodebuild_logs/xcodebuild.log
 
-          status=${PIPESTATUS[0]}
+          status=$?
           if [ $status -ne 0 ]; then
-            echo "--- ERRORS ---"
-            grep " error:" /tmp/xcodebuild_logs/xcodebuild.log | tail -50 || true
+            echo "--- xcodebuild error lines ---"
+            grep -n "error:" /tmp/xcodebuild_logs/xcodebuild.log | tail -n 200 || true
+            echo "--- xcodebuild last 200 lines ---"
+            tail -n 200 /tmp/xcodebuild_logs/xcodebuild.log
             exit $status
           fi
 
-      - name: Export IPA
-        script: |
-          set -e
-          mkdir -p ios/build/export
-
-          cat > /tmp/ExportOptions.plist <<EOF
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>method</key>
-            <string>app-store</string>
-            <key>uploadBitcode</key>
-            <false/>
-            <key>compileBitcode</key>
-            <false/>
-          </dict>
-          </plist>
-          EOF
-
-          "$DEVELOPER_DIR/usr/bin/xcodebuild" \
-            -exportArchive \
-            -archivePath ios/build/TowRides.xcarchive \
-            -exportOptionsPlist /tmp/ExportOptions.plist \
-            -exportPath ios/build/export \
-            2>&1
-
     artifacts:
-      - ios/build/export/*.ipa
-      - ios/build/TowRides.xcarchive
+      - ios/build/**/*.xcarchive
       - /tmp/xcodebuild_logs/*.log
