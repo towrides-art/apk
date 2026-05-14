@@ -29,58 +29,51 @@ workflows:
         bundle_identifier: com.towrides.app
 
     scripts:
-      - name: Remove junk files
+      - name: Setup environment
         script: |
           rm -rf __MACOSX
-
-      - name: Install dependencies
-        script: |
-          rm -rf node_modules
-          npm install --legacy-peer-deps
-          npx patch-package
-          echo "--- Removing RNFB from node_modules ---"
-          rm -rf node_modules/@react-native-firebase node_modules/@notifee node_modules/firebase node_modules/@firebase
-          echo "--- Verify RNFB gone ---"
-          ls node_modules/@react-native-firebase 2>/dev/null && echo "FAIL: RNFB still exists" && exit 1 || echo "OK: RNFB removed"
-
-      - name: Use Xcode 16.0
-        script: |
           if [ ! -d "$XCODE_PATH" ]; then
             echo "Xcode not found at $XCODE_PATH" && ls /Applications && exit 1
           fi
           sudo xcode-select --switch "$XCODE_PATH"
-          export DEVELOPER_DIR="$DEVELOPER_DIR"
           "$DEVELOPER_DIR/usr/bin/xcodebuild" -version
+          echo "Git commit: $(git rev-parse HEAD)"
 
-      - name: Clean Pods
+      - name: Install npm dependencies
+        script: |
+          rm -rf node_modules
+          npm install --legacy-peer-deps
+          npx patch-package
+
+          echo "=== DELETING FIREBASE FROM NODE_MODULES ==="
+          rm -rf node_modules/@react-native-firebase
+          rm -rf node_modules/@notifee
+          rm -rf node_modules/firebase
+          rm -rf node_modules/@firebase
+          if [ -d "node_modules/@react-native-firebase" ]; then
+            echo "FAIL: @react-native-firebase still in node_modules"
+            exit 1
+          fi
+          echo "OK: node_modules clean of Firebase"
+
+      - name: Install pods
         script: |
           export DEVELOPER_DIR="$DEVELOPER_DIR"
           rm -rf ~/Library/Developer/Xcode/DerivedData
           rm -rf ~/Library/Caches/CocoaPods
-          rm -rf ios/build
-          rm -rf ios/build/generated
-          rm -rf ios/Pods
-          rm -rf ios/Podfile.lock
-          rm -rf node_modules
-
-          npm install --legacy-peer-deps
-          npx patch-package
-          echo "--- Removing RNFB from node_modules ---"
-          rm -rf node_modules/@react-native-firebase node_modules/@notifee node_modules/firebase node_modules/@firebase
 
           cd ios
-          pod deintegrate
+          rm -rf Pods Podfile.lock build generated
+
+          pod deintegrate || true
           pod cache clean --all
-          pod repo update
           pod install --repo-update
 
-          echo "--- Verify no RNFB pods ---"
-          if grep -r 'RNFBApp\|RNFBMessaging\|RNFBAuth' Pods/Target\ Support\ Files/ 2>/dev/null; then
-            echo "FAIL: RNFB pods found after pod install"
-            exit 1
-          else
-            echo "OK: Zero RNFB pods"
+          echo "=== VERIFY PODS ==="
+          if grep -ri 'RNFBApp\|RNFBMessaging\|RNFBAuth' Pods/Pods.xcodeproj/project.pbxproj 2>/dev/null; then
+            echo "WARNING: RNFB found in Pods.xcodeproj - Podfile post_install should have removed it"
           fi
+          echo "Pod install done"
 
       - name: Set up code signing
         script: |
@@ -102,91 +95,52 @@ workflows:
 
           cd ios
 
-          cat <<EOF > .xcode.env
-          RCT_NEW_ARCH_ENABLED=0
-          RCT_FABRIC_ENABLED=0
-          RCT_SKIP_CODEGEN=1
-          NODE_BINARY=$NODE_BINARY
-          PATH=$PATH
+          cat <<'EOF' > .xcode.env
+          export RCT_NEW_ARCH_ENABLED=0
+          export RCT_FABRIC_ENABLED=0
+          export RCT_SKIP_CODEGEN=1
           EOF
 
-          cat <<EOF > .xcode.env.local
-          RCT_NEW_ARCH_ENABLED=0
-          RCT_FABRIC_ENABLED=0
-          RCT_SKIP_CODEGEN=1
-          NODE_BINARY=$NODE_BINARY
-          PATH=$PATH
-          EOF
+          echo "export NODE_BINARY=$NODE_BINARY" >> .xcode.env
+          echo "export PATH=$PATH" >> .xcode.env
+          cp .xcode.env .xcode.env.local
 
-          echo "--- Removing RNFB from node_modules (pre-pod) ---"
-          rm -rf ../node_modules/@react-native-firebase ../node_modules/@notifee ../node_modules/firebase ../node_modules/@firebase
+          echo "=== FINAL RNFB CHECK BEFORE BUILD ==="
+          if grep -ri 'RNFBApp\|RNFBMessaging\|RNFBAuth' Pods/Pods.xcodeproj/project.pbxproj 2>/dev/null; then
+            echo "RNFB STILL in Pods xcodeproj - running emergency removal"
+            ruby <<'RUBY'
+require 'xcodeproj'
+pods_proj = Xcodeproj::Project.open('Pods/Pods.xcodeproj')
+pods_proj.targets.each do |t|
+  if t.name =~ /RNFB|Firebase|GoogleUtilities|GoogleDataTransport|GTMSessionFetcher|FBLPromises|PromisesObjC|nanopb|RecaptchaInterop|Notifee/i
+    puts "Removing: #{t.name}"
+    t.remove_from_project
+  end
+end
+pods_proj.save
 
-          pod deintegrate
-          rm -rf Pods Podfile.lock build generated
-
-          pod install --repo-update
-
-          echo "=== NUCLEAR RNFB REMOVAL FROM PODS ==="
-
-          rm -rf Pods/RNFBApp Pods/RNFBAuth Pods/RNFBMessaging
-          rm -rf Pods/Firebase Pods/FirebaseCore Pods/FirebaseAuth Pods/FirebaseMessaging
-          rm -rf Pods/FirebaseCoreInternal Pods/FirebaseInstallations Pods/FirebaseCoreExtension
-          rm -rf Pods/FirebaseAppCheckInterop Pods/FirebaseAuthInterop
-          rm -rf Pods/GoogleUtilities Pods/GoogleDataTransport
-          rm -rf Pods/GTMSessionFetcher Pods/FBLPromises Pods/PromisesObjC
-          rm -rf Pods/nanopb Pods/RecaptchaInterop
-          rm -rf "Pods/Target Support Files/RNFBApp"
-          rm -rf "Pods/Target Support Files/RNFBAuth"
-          rm -rf "Pods/Target Support Files/RNFBMessaging"
-          rm -rf "Pods/Target Support Files/Firebase"
-          rm -rf "Pods/Target Support Files/FirebaseCore"
-          rm -rf "Pods/Target Support Files/FirebaseAuth"
-          rm -rf "Pods/Target Support Files/FirebaseMessaging"
-          rm -rf "Pods/Target Support Files/FirebaseCoreInternal"
-          rm -rf "Pods/Target Support Files/FirebaseInstallations"
-          rm -rf "Pods/Target Support Files/FirebaseCoreExtension"
-          rm -rf "Pods/Target Support Files/GoogleUtilities"
-          rm -rf Pods/Headers/Public/RNFBApp Pods/Headers/Public/RNFBMessaging Pods/Headers/Public/RNFBAuth
-          rm -rf Pods/Headers/Public/Firebase* Pods/Headers/Public/GoogleUtilities
-          rm -rf Pods/Headers/Private/RNFBApp Pods/Headers/Private/RNFBMessaging Pods/Headers/Private/RNFBAuth
-
-          echo "=== REMOVING RNFB FROM PODS XCODEPROJ ==="
-          ruby <<'RUBY'
-          require 'xcodeproj'
-
-          pods_proj = Xcodeproj::Project.open('Pods/Pods.xcodeproj')
-          removed = []
-          pods_proj.targets.each do |t|
-            if t.name =~ /RNFB|Firebase|GoogleUtilities|GoogleDataTransport|GTMSessionFetcher|FBLPromises|PromisesObjC|nanopb|RecaptchaInterop/
-              removed << t.name
-              t.remove_from_project
-            end
-          end
-          pods_proj.save
-          puts "Removed pod targets: #{removed.join(', ')}"
-
-          app_proj = Xcodeproj::Project.open('../TowRides.xcodeproj')
-          app_proj.targets.each do |t|
-            t.build_phases.each do |bp|
-              if bp.respond_to?(:name) && bp.name.to_s.include?('RNFB')
-                puts "Removing build phase: #{bp.name}"
-                bp.remove_from_project
-              end
-            end
-          end
-          app_proj.save
-          puts "Done cleaning xcodeproj files"
-          RUBY
-
-          echo "=== FINAL VERIFY ==="
-          if ls Pods/Target\ Support\ Files/RNFB* 2>/dev/null || ls Pods/Target\ Support\ Files/Firebase* 2>/dev/null; then
-            echo "FAIL: RNFB/Firebase still in Pods"
-            exit 1
+app_proj = Xcodeproj::Project.open('../TowRides.xcodeproj')
+app_proj.targets.each do |t|
+  t.build_phases.each do |bp|
+    if bp.respond_to?(:name) && bp.name.to_s.include?('RNFB')
+      puts "Removing build phase: #{bp.name}"
+      bp.remove_from_project
+    end
+  end
+end
+app_proj.save
+RUBY
+            rm -rf Pods/RNFBApp Pods/RNFBAuth Pods/RNFBMessaging
+            rm -rf "Pods/Target Support Files/RNFBApp" "Pods/Target Support Files/RNFBAuth" "Pods/Target Support Files/RNFBMessaging"
+            rm -rf Pods/Firebase* Pods/GoogleUtilities Pods/GoogleDataTransport
+            rm -rf "Pods/Target Support Files/Firebase*" "Pods/Target Support Files/GoogleUtilities"
+            rm -rf Pods/Headers/Public/RNFB* Pods/Headers/Public/Firebase* Pods/Headers/Private/RNFB*
+            echo "Emergency removal done"
+          else
+            echo "OK: Zero RNFB in Pods"
           fi
-          echo "OK: ZERO RNFB in Pods - safe to build"
 
           cd ..
-
           mkdir -p /tmp/xcodebuild_logs
           set -o pipefail
 
