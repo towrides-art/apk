@@ -37,18 +37,6 @@ workflows:
           npm cache clean --force
           npm install --legacy-peer-deps --no-audit --no-fund
 
-          echo "=== Deleting Firebase packages ==="
-          rm -rf node_modules/@react-native-firebase
-          rm -rf node_modules/firebase
-          rm -rf node_modules/@firebase
-          rm -rf node_modules/@notifee
-
-          if [ -d "node_modules/@react-native-firebase" ]; then
-            echo "ERROR: @react-native-firebase still exists!"
-            exit 1
-          fi
-          echo "OK: No Firebase in node_modules"
-
       - name: Configure Xcode
         script: |
           set -e
@@ -60,46 +48,12 @@ workflows:
           set -e
           export DEVELOPER_DIR="$DEVELOPER_DIR"
 
-          # Nuclear delete BEFORE pod install
-          rm -rf node_modules/@react-native-firebase
-          rm -rf node_modules/firebase
-          rm -rf node_modules/@firebase
-          rm -rf node_modules/@notifee
-          echo "Firebase packages deleted from node_modules"
-
           cd ios
           pod deintegrate || true
           rm -rf Pods Podfile.lock build
           pod cache clean --all
           pod install --repo-update 2>&1
 
-          # Remove [CP-User] [RNFB] Core Configuration build phase from xcodeproj
-          ruby -e "
-            require 'xcodeproj'
-            path = File.expand_path('TowRides.xcodeproj', Dir.pwd)
-            project = Xcodeproj::Project.open(path)
-            changed = false
-            project.targets.each do |target|
-              before = target.build_phases.size
-              target.build_phases.reject! do |phase|
-                n = phase.respond_to?(:name) ? phase.name.to_s : ''
-                remove = n.include?('RNFB') || n.include?('Firebase')
-                puts \"[Ruby] Removing build phase: \#{n}\" if remove
-                remove
-              end
-              changed = true if target.build_phases.size != before
-            end
-            project.save if changed
-            puts '[Ruby] xcodeproj saved, RNFB phases removed'
-          "
-
-          # Verify no RNFB pods were installed
-          if grep -qiE "RNFBApp|RNFBAuth|RNFBMessaging|FirebaseCore|FirebaseAuth|FirebaseMessaging" Podfile.lock 2>/dev/null; then
-            echo "ERROR: Firebase pods found in Podfile.lock!"
-            grep -iE "RNFB|Firebase" Podfile.lock
-            exit 1
-          fi
-          echo "OK: No Firebase pods in Podfile.lock"
           grep -E "^  - " Podfile.lock | head -60
 
       - name: Set up code signing
@@ -114,29 +68,6 @@ workflows:
           export RCT_FABRIC_ENABLED=0
           export USE_HERMES=0
           export RCT_SKIP_CODEGEN=1
-
-          # FINAL HARD DELETE - last line of defense before xcodebuild
-          echo "=== FINAL Firebase purge ==="
-          rm -rf node_modules/@react-native-firebase
-          rm -rf node_modules/firebase
-          rm -rf node_modules/@firebase
-          rm -rf node_modules/@notifee
-          ls node_modules | grep -iE "firebase|RNFB|notifee" && echo "WARNING: Firebase still in node_modules!" && exit 1 || echo "OK: node_modules clean"
-
-          # If RNFB still in Podfile.lock, re-run pod install clean
-          if grep -qiE "RNFBApp|RNFBAuth|RNFBMessaging|FirebaseCore" ios/Podfile.lock 2>/dev/null; then
-            echo "RNFB in Podfile.lock - re-running clean pod install"
-            rm -rf ios/Pods ios/Podfile.lock ios/build
-            cd ios
-            pod deintegrate || true
-            pod install --repo-update 2>&1
-            cd ..
-            if grep -qiE "RNFBApp|RNFBAuth|RNFBMessaging|FirebaseCore" ios/Podfile.lock 2>/dev/null; then
-              echo "FATAL: RNFB still in Podfile.lock after clean install"
-              exit 1
-            fi
-          fi
-          echo "OK: Podfile.lock is Firebase-free"
 
           NODE_BINARY="$(command -v node)"
           export NODE_BINARY
@@ -153,8 +84,6 @@ workflows:
           rm -rf ~/Library/Developer/Xcode/DerivedData
           rm -rf ios/build
 
-          # NOTE: working dir is project root, NOT ios/
-          # So -workspace path must include ios/
           set -o pipefail
           "$DEVELOPER_DIR/usr/bin/xcodebuild" \
             -workspace ios/TowRides.xcworkspace \
