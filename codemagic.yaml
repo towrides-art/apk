@@ -29,7 +29,6 @@ workflows:
         script: |
           rm -rf node_modules
           npm install --legacy-peer-deps
-          rm -rf node_modules/@react-native-firebase node_modules/@notifee node_modules/firebase node_modules/@firebase
           npx patch-package
 
       - name: Use Xcode 16.0
@@ -53,7 +52,6 @@ workflows:
           rm -rf node_modules
 
           npm install --legacy-peer-deps
-          rm -rf node_modules/@react-native-firebase node_modules/@notifee node_modules/firebase node_modules/@firebase
           npx patch-package
 
           cd ios
@@ -79,8 +77,6 @@ workflows:
           fi
           export NODE_BINARY
           export PATH="$(dirname "$NODE_BINARY"):$PATH"
-
-          rm -rf node_modules/@react-native-firebase node_modules/@notifee node_modules/firebase node_modules/@firebase
 
           cd ios
 
