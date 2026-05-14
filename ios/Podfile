@@ -18,19 +18,36 @@ prepare_react_native_project!
 
 use_frameworks! :linkage => :static
 
-FIREBASE_BLOCK = %w[
-  @react-native-firebase/app
-  @react-native-firebase/auth
-  @react-native-firebase/messaging
-  @notifee/react-native
+# ── Monkey-patch: intercept pod() calls to block Firebase/RNFB ──
+BLOCKED_POD_PREFIXES = %w[
+  RNFBApp RNFBAuth RNFBMessaging
+  Firebase FirebaseCore FirebaseAuth FirebaseMessaging
+  FirebaseCoreInternal FirebaseInstallations FirebaseCoreExtension
+  FirebaseAppCheckInterop FirebaseAuthInterop
+  GoogleUtilities GoogleDataTransport
+  GTMSessionFetcher FBLPromises PromisesObjC
+  nanopb RecaptchaInterop NotifeeCore RNNotifee
 ]
+
+module BlockFirebasePods
+  def pod(name, *args, **kwargs, &block)
+    if BLOCKED_POD_PREFIXES.any? { |prefix| name.start_with?(prefix) }
+      puts "[PODFILE-BLOCK] Skipping pod: #{name}"
+      return
+    end
+    super(name, *args, **kwargs, &block)
+  end
+end
+
+class Podfile
+  class TargetDefinition
+    prepend BlockFirebasePods
+  end
+end
+# ── End monkey-patch ──
 
 target 'TowRides' do
   config = use_native_modules!
-
-  if config[:dependencies]
-    config[:dependencies].reject! { |dep| FIREBASE_BLOCK.any? { |blocked| dep[:name] == blocked } }
-  end
 
   use_react_native!(
     :path => config[:reactNativePath],
@@ -49,11 +66,6 @@ target 'TowRides' do
     )
 
     installer.pods_project.targets.each do |target|
-      if target.name =~ /RNFB|Firebase|GoogleUtilities|GoogleDataTransport|GTMSessionFetcher|FBLPromises|PromisesObjC|nanopb|RecaptchaInterop|Notifee/i
-        puts "[POST_INSTALL] Removing target: #{target.name}"
-        target.remove_from_project
-        next
-      end
       target.build_configurations.each do |cfg|
         cfg.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'
         cfg.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++20'
