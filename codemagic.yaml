@@ -15,7 +15,7 @@ workflows:
           source: true
 
     environment:
-      xcode: 16.0
+      xcode: 16.0fix kar
       cocoapods: default
       node: 18.20.4
       vars:
@@ -75,28 +75,28 @@ workflows:
           find Pods/Headers -name "Firebase*" -exec rm -rf {} + 2>/dev/null || true
 
           echo "=== SCRUB RNFB FROM XCODEPROJ FILES ==="
-          ruby - <<'RUBY'
-require 'xcodeproj'
-proj = Xcodeproj::Project.open('Pods/Pods.xcodeproj')
-removed = []
-proj.targets.to_a.each do |t|
-  if t.name =~ /RNFB|Firebase|GoogleUtilities|GoogleDataTransport|GTMSessionFetcher|FBLPromises|PromisesObjC|nanopb|RecaptchaInterop|Notifee/i
-    removed << t.name
-    t.remove_from_project
-  end
-end
-proj.save
-puts removed.empty? ? "No RNFB targets in Pods.xcodeproj (GOOD)" : "Removed #{removed.length}: #{removed.join(', ')}"
-
-app = Xcodeproj::Project.open('../TowRides.xcodeproj')
-app.targets.each do |t|
-  t.build_phases.select { |bp| bp.respond_to?(:name) && bp.name.to_s =~ /RNFB|Firebase/i }.each do |bp|
-    puts "Removing build phase: #{bp.name}"
-    bp.remove_from_project
-  end
-end
-app.save
-RUBY
+          cat > /tmp/remove_rnfb.rb << 'EOF'
+          require 'xcodeproj'
+          proj = Xcodeproj::Project.open('Pods/Pods.xcodeproj')
+          removed = []
+          proj.targets.to_a.each do |t|
+            if t.name =~ /RNFB|Firebase|GoogleUtilities|GoogleDataTransport|GTMSessionFetcher|FBLPromises|PromisesObjC|nanopb|RecaptchaInterop|Notifee/i
+              removed << t.name
+              t.remove_from_project
+            end
+          end
+          proj.save
+          puts removed.empty? ? "No RNFB targets in Pods.xcodeproj (GOOD)" : "Removed #{removed.length}: #{removed.join(', ')}"
+          app = Xcodeproj::Project.open('../TowRides.xcodeproj')
+          app.targets.each do |t|
+            t.build_phases.select { |bp| bp.respond_to?(:name) && bp.name.to_s =~ /RNFB|Firebase/i }.each do |bp|
+              puts "Removing build phase: #{bp.name}"
+              bp.remove_from_project
+            end
+          end
+          app.save
+          EOF
+          ruby /tmp/remove_rnfb.rb
 
           echo "=== FINAL VERIFICATION ==="
           if grep -riq 'RNFBApp\|RNFBMessaging\|RNFBAuth' Pods/Pods.xcodeproj/project.pbxproj 2>/dev/null; then
